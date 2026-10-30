@@ -1,0 +1,132 @@
+# Live-dealer table games stack
+#
+#   cp .env.example .env              (optional)
+#   docker compose up -d --build
+#   docker compose run --rm seed      (demo data on an empty database)
+#
+name: tablegames
+
+x-redis-env: &redis-env
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+services:
+  mongo:
+    image: mongo:7
+    # single node replica set: the game server settles bets in transactions
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes $${REDIS_PASSWORD:+--requirepass \"$$REDIS_PASSWORD\"}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\" --no-auth-warning} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  socket-server:
+    build: ./socket-server
+    environment:
+      <<: *redis-env
+      APP_NAME: socket-server-1
+      HTTP_PORT: 8000
+      WORKERS: ${SOCKET_SERVER_WORKERS:-2}
+      SHUTDOWN_TIMEOUT_MS: 10000
+    stop_grace_period: 15s
+    ports:
+      - "${SOCKET_SERVER_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  game-server:
+    build: ./game-server
+    environment: &game-env
+      <<: *redis-env
+      GAMES: baccarat,dragontiger,poker
+      BACCARAT_PORT: 8007
+      DRAGONTIGER_PORT: 8008
+      POKER_PORT: 8009
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_SHARED_DB: nihtan_api
+      API_HISTORY_URL: ${API_HISTORY_URL:-}
+    ports:
+      - "${BACCARAT_PORT:-8007}:8007"
+      - "${DRAGONTIGER_PORT:-8008}:8008"
+      - "${POKER_PORT:-8009}:8009"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # the socket-server must be listening before the games publish their init data
+      socket-server:
+        condition: service_healthy
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  # player front-end (Next.js): lobby at /, games at /baccarat, /dragon-tiger, /poker
+  web:
+    build: ${GAME_FRONT_DIR:-../web}
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_SHARED_DB: nihtan_api
+      # url of the socket-server as seen from the players' browsers
+      APP_SOCKET: ${PUBLIC_SOCKET_URL:-http://localhost:8000}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env (32+ random characters)}
+      SESSION_SECURE: ${SESSION_SECURE:-false}
+      API_URL: ${VENDOR_API_URL:-}
+      DEV_LOGIN: ${DEV_LOGIN:-false}
+      # HLS live video per table when game_tables.env_setting.hls is not set, see web/src/lib/video.ts
+      HLS_URL_TEMPLATE: ${HLS_URL_TEMPLATE:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # development only: fake live HLS video for every table (enable with COMPOSE_PROFILES=dev and
+  # HLS_URL_TEMPLATE=http://localhost:8080/hls/{app}-{table}.m3u8)
+  hls-dev:
+    build: ./dev/hls-stream
+    ports:
+      - "${HLS_DEV_PORT:-8080}:8080"
+    profiles: ["dev"]
+    restart: unless-stopped
+
+  # one-shot demo data loader: docker compose run --rm seed
+  seed:
+    build: ./game-server
+    command: ["node", "scripts/seed.js"]
+    environment: *game-env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  mongo-data:
+  redis-data:

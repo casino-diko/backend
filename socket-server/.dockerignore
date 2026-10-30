@@ -1,0 +1,14 @@
+**/.git
+**/node_modules
+npm-debug.log
+*.log
+.env*
+.idea
+*.swp
+docs
+html
+socketDiagram.jpg
+conf.json
+readme.md
+Dockerfile
+.dockerignore

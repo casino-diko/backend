@@ -1,4 +1,5 @@
-import { SecretForm } from '../forms';
+import { EmbedOriginsForm, SecretForm } from '../forms';
+import { lobbyTypeAction } from '@/lib/actions';
 import { config } from '@/lib/config';
 import { getDb } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
@@ -9,7 +10,7 @@ export default async function VendorsPage () {
 	await requireAdmin();
 	const db = await getDb();
 	const [vendors, counts]: [any[], any[]] = await Promise.all([
-		db.shared.vendors.find({}, { vendor_name : 1, integration_type : 1, currency : 1, is_active : 1, secret_key : 1 }).sort({ _id : 1 }).lean(),
+		db.shared.vendors.find({}, { vendor_name : 1, integration_type : 1, currency : 1, is_active : 1, secret_key : 1, embed_origins : 1, lobby_type : 1 }).sort({ _id : 1 }).lean(),
 		db.shared.users.aggregate([{ $match : { deleted_at : null } }, { $group : { _id : '$vendor_id', n : { $sum : 1 } } }])
 	]);
 	const players = new Map(counts.map(c => [c._id, c.n]));
@@ -24,7 +25,7 @@ export default async function VendorsPage () {
 				</p>
 				<p className="muted">
 					<code>{config.playerSite}/launch?vendor=&lt;vendor name&gt;&amp;payload=&lt;base64url JSON&gt;&amp;hash=&lt;HMAC-SHA256 hex&gt;</code>
-					{' '}· payload fields and an example: the web repo&apos;s README, section &quot;Player sign-in&quot;.
+					{' '}· the operator guide is <code>OPERATORS.md</code> in the web repo.
 				</p>
 			</div>
 			{vendors.map(v => {
@@ -43,7 +44,20 @@ export default async function VendorsPage () {
 							</span>
 						</div>
 						<p className={secret.length >= MIN_SECRET ? 'muted' : 'error'}>{(players.get(v._id) || 0).toLocaleString('en-US')} players · {status}</p>
-						<SecretForm vendorId={v._id} vendorName={v.vendor_name} hasSecret={!!secret} />
+						<form action={lobbyTypeAction} className="row filters">
+							<input type="hidden" name="vendor_id" value={v._id} />
+							<label>Lobby
+								<select name="lobby" defaultValue={v.lobby_type === 'integrated' ? 'integrated' : 'normal'}>
+									<option value="normal">ours: players pick tables in our lobby</option>
+									<option value="integrated">the operator&apos;s: the lobby button returns to their site</option>
+								</select>
+							</label>
+							<button type="submit" className="secondary">Save lobby</button>
+						</form>
+						<div className="grid">
+							<SecretForm vendorId={v._id} vendorName={v.vendor_name} hasSecret={!!secret} />
+							<EmbedOriginsForm vendorId={v._id} origins={Array.isArray(v.embed_origins) ? v.embed_origins : []} />
+						</div>
 					</div>
 				);
 			})}

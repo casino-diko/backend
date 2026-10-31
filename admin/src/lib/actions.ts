@@ -15,7 +15,7 @@ import { redirect } from 'next/navigation';
 import { adjustCredits, createUser, setPassword, unlockUser } from './players';
 import { checkCredentials, endSession, requireAdmin, startSession } from './session';
 import { Invalid, parseAmount, parseNewUser } from './validate';
-import { rotateSecret } from './vendors';
+import { parseEmbedOrigins, rotateSecret, setEmbedOrigins, setLobbyType } from './vendors';
 
 export type FormState = { error? : string; ok? : string; secret? : string } | null;
 
@@ -102,4 +102,27 @@ export async function rotateSecretAction (_prev: FormState, form: FormData): Pro
 	} catch (e) {
 		return failure(e);
 	}
+}
+
+export async function embedOriginsAction (_prev: FormState, form: FormData): Promise<FormState> {
+	const admin = await requireAdmin();
+	try {
+		const vendorId = Number(form.get('vendor_id'));
+		const origins = parseEmbedOrigins(String(form.get('origins') ?? ''));
+		await setEmbedOrigins(vendorId, origins);
+		console.log(`[admin] ${admin} set embed origins of vendor ${vendorId}: ${origins.join(' ') || '(none)'}`);
+		revalidatePath('/vendors');
+		return { ok : origins.length ? `Saved ${origins.length} site${origins.length === 1 ? '' : 's'}.` : 'Saved: no site can embed the games.' };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+export async function lobbyTypeAction (form: FormData) {
+	const admin = await requireAdmin();
+	const vendorId = Number(form.get('vendor_id'));
+	const integrated = form.get('lobby') === 'integrated';
+	await setLobbyType(vendorId, integrated);
+	console.log(`[admin] ${admin} set the lobby of vendor ${vendorId} to ${integrated ? 'integrated' : 'normal'}`);
+	revalidatePath('/vendors');
 }

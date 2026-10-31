@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { adjustCreditsAction, createUserAction, login, rotateSecretAction, setPasswordAction, type FormState } from '@/lib/actions';
+import { adjustCreditsAction, createUserAction, embedOriginsAction, login, rotateSecretAction, setPasswordAction, type FormState } from '@/lib/actions';
 
 const Message = ({ state }: { state : FormState }) => (
 	<>
@@ -131,6 +131,21 @@ export function SecretForm ({ vendorId, vendorName, hasSecret }: { vendorId : nu
 					)}
 					<button type="submit" className="secondary" disabled={pending}>{pending ? 'Generating…' : hasSecret ? 'Generate a new secret' : 'Generate a secret'}</button>
 				</>}
+		</form>
+	);
+}
+
+/** the operator sites allowed to show the games in an iframe, one per line */
+export function EmbedOriginsForm ({ vendorId, origins }: { vendorId : number; origins : string[] }) {
+	const [state, action, pending] = useActionState(embedOriginsAction, null);
+	return (
+		<form action={action}>
+			<Message state={state} />
+			<input type="hidden" name="vendor_id" value={vendorId} />
+			<label>Sites that may embed the games <small>(one per line, e.g. https://casino.example)</small>
+				<textarea name="origins" rows={Math.max(2, origins.length + 1)} defaultValue={origins.join('\n')} spellCheck={false} />
+			</label>
+			<button type="submit" className="secondary" disabled={pending}>{pending ? 'Saving…' : 'Save sites'}</button>
 		</form>
 	);
 }

@@ -2,7 +2,8 @@
  |--------------------------------------------------------------------------
  | players
  |--------------------------------------------------------------------------
- | Creating players, credit adjustments and the activity of a player.
+ | Creating players and credit adjustments (a player's list of
+ | transactions is in activity.ts).
  |
  | Money only lives in users.money for vendors with integration_type
  | 'transfer'; seamless vendors hold the balance in their own wallet API, so
@@ -18,7 +19,6 @@
 import { randomBytes, scrypt as scryptCb } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { ClientSession } from 'mongoose';
-import { GAMES, GAME_LABELS, type Game } from './config';
 import { getDb, type Db } from './db';
 import { Invalid, addMoney, type NewUser } from './validate';
 
@@ -140,78 +140,4 @@ export async function createUser (input: NewUser, admin: string, requestId: stri
 		if (isDuplicateKey(e)) throw new Invalid('This form was already submitted');
 		throw e;
 	}
-}
-
-// ------------------------------------------------------------------ activity
-
-export type Activity = {
-	key      : string;
-	at       : Date;
-	kind     : 'credit' | 'debit' | 'bet';
-	label    : string;
-	detail   : string;
-	amount   : number;         // signed change of the balance (bets: payout - stake, once resulted)
-	stake?   : number;
-	payout?  : number;
-	pending? : boolean;
-	balance? : number | null;  // after the adjustment (admin transactions only)
-	by?      : string | null;
-};
-
-const ROUND_STATUS: Record<string, string> = { S : 'betting', P : 'dealing', H : 'on hold', E : 'resulted' };
-
-async function gameBets (db: Db, game: Game, userId: number, limit: number): Promise<Activity[]> {
-	const g = db.games[game];
-	const bets: any[] = await g.bets.find({ user_id : userId }).sort({ _id : -1 }).limit(limit).lean();
-	if (!bets.length) return [];
-
-	const rounds: any[] = await g.rounds.find({ _id : { $in : bets.map(b => b.round_id) } }, { table_id : 1, round_num : 1, status : 1 }).lean();
-	const byId = new Map(rounds.map(r => [r._id, r]));
-
-	return bets.map(b => {
-		const round = byId.get(b.round_id);
-		const stake = Number(b.total_bet) || 0;
-		const resulted = round?.status === 'E';
-		const payout = resulted ? Number(b.total_win) || 0 : 0;
-		return {
-			key     : `${game}-${b._id}`,
-			at      : b.created_at,
-			kind    : 'bet',
-			label   : `${GAME_LABELS[game]} bet`,
-			detail  : round
-				? `table ${round.table_id ?? b.table_id ?? '?'} · round ${round.round_num ?? b.round_num ?? '?'} · ${ROUND_STATUS[round.status] || round.status}`
-				: `round ${b.round_id}`,
-			amount  : resulted ? addMoney(payout, -stake) : -stake,
-			stake,
-			payout  : resulted ? payout : undefined,
-			pending : !resulted
-		} satisfies Activity;
-	});
-}
-
-/** the latest `limit` adjustments and bets of a player, newest first */
-export async function userActivity (userId: number, limit: number, kinds: { credits : boolean; bets : boolean }): Promise<Activity[]> {
-	const db = await getDb();
-
-	const sources: Promise<Activity[]>[] = [];
-	if (kinds.credits) {
-		sources.push(db.shared.transactions.find({ user_id : userId }).sort({ _id : -1 }).limit(limit).lean().then((rows: any[]) => rows.map((t): Activity => ({
-			key     : `tx-${t._id}`,
-			at      : t.created_at,
-			kind    : t.type,
-			label   : t.type === 'credit' ? 'Credit added' : 'Credit deducted',
-			detail  : t.note || '',
-			amount  : t.type === 'credit' ? t.amount : -t.amount,
-			balance : t.balance_after ?? null,
-			by      : t.admin || null
-		}))));
-	}
-	if (kinds.bets) {
-		for (const game of GAMES) sources.push(gameBets(db, game, userId, limit));
-	}
-
-	// every source is newest first, so the newest `limit` of the union are within the first `limit` of each
-	const all = (await Promise.all(sources)).flat();
-	all.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-	return all.slice(0, limit);
 }

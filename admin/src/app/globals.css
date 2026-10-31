@@ -54,9 +54,6 @@ button:disabled { opacity: .6; cursor: default; }
 .seg label { margin: 0; padding: 6px 14px; cursor: pointer; font-weight: 500; }
 .seg input { display: none; }
 .seg label:has(input:checked) { background: var(--accent); color: #fff; }
-.seg.tabs { margin: 0; }
-.seg.tabs a { padding: 6px 12px; }
-.seg.tabs a.on { background: var(--accent); color: #fff; text-decoration: none; }
 .spread h2 { margin: 0; }
 
 table { width: 100%; border-collapse: collapse; }
@@ -73,5 +70,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .ok { color: var(--good); margin: 0 0 12px; }
 .note { background: var(--warn-bg); padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; }
 .stat { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.pager { display: flex; gap: 16px; margin-top: 12px; }
+.pager { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+.pager .pages { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+th a.sort { color: inherit; }
+th a.sort.on { color: var(--text); }
 .login { max-width: 340px; margin: 80px auto; }
+.filters { margin-bottom: 12px; }

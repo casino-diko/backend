@@ -26,7 +26,7 @@ const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: n
 
 export const isTransfer = (vendor: any) => !!vendor && vendor.integration_type !== 'seamless';
 
-/** scrypt$<salt hex>$<hash hex>; the player front-end has no password login yet */
+/** scrypt$<salt hex>$<hash hex>, what the player front-end's /login checks (web repo: src/lib/password.ts) */
 async function hashPassword (password: string): Promise<string> {
 	const salt = randomBytes(16);
 	const hash = await scrypt(password, salt, 64);
@@ -140,4 +140,23 @@ export async function createUser (input: NewUser, admin: string, requestId: stri
 		if (isDuplicateKey(e)) throw new Invalid('This form was already submitted');
 		throw e;
 	}
+}
+
+// ------------------------------------------------------------------ sign-in
+
+/** a new password for /login; also lifts a lockout, so the player can use it at once */
+export async function setPassword (userId: number, password: string): Promise<void> {
+	if (password.length < 8 || password.length > 200) throw new Invalid('Password: 8 to 200 characters');
+	const db = await getDb();
+	const res = await db.shared.users.updateOne(
+		{ _id : userId, deleted_at : null },
+		{ $set : { password : await hashPassword(password), login_failures : 0 }, $unset : { locked_until : 1 } }
+	);
+	if (!res.matchedCount) throw new Invalid('Player not found');
+}
+
+/** lifts a lockout after too many wrong passwords */
+export async function unlockUser (userId: number): Promise<void> {
+	const db = await getDb();
+	await db.shared.users.updateOne({ _id : userId }, { $set : { login_failures : 0 }, $unset : { locked_until : 1 } });
 }

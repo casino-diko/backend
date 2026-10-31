@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { CreditForm } from '../../forms';
+import { CreditForm, PasswordForm } from '../../forms';
 import { Pager, SortHeader } from '../../list';
 import { listActivity } from '@/lib/activity';
 import { PAGE_SIZES, activityHref, parseActivityQuery, type ActivityQuery, type Sort } from '@/lib/activityQuery';
 import { GAMES, GAME_LABELS } from '@/lib/config';
 import { getDb } from '@/lib/db';
 import { dateTime, money, signed } from '@/lib/format';
+import { unlockAction } from '@/lib/actions';
 import { isTransfer } from '@/lib/players';
 import { requireAdmin } from '@/lib/session';
 
@@ -31,6 +32,8 @@ export default async function UserPage ({ params, searchParams }: Props) {
 	const vendor: any = await db.shared.vendors.findById(user.vendor_id).lean();
 	const transfer = isTransfer(vendor);
 	const currency = user.currency || vendor?.currency || '';
+	const lockedUntil = user.locked_until && new Date(user.locked_until) > new Date() ? new Date(user.locked_until) : null;
+	const hasPassword = typeof user.password === 'string' && user.password.startsWith('scrypt$');
 
 	const result = await listActivity(id, query);
 	const shown: ActivityQuery = { ...query, page : result.page };
@@ -67,6 +70,25 @@ export default async function UserPage ({ params, searchParams }: Props) {
 						<CreditForm userId={id} requestId={randomUUID()} />
 					</div>
 				)}
+
+				<div className="panel">
+					<h2>Sign-in</h2>
+					{lockedUntil && (
+						<form action={unlockAction} className="note">
+							<input type="hidden" name="user_id" value={id} />
+							<p>Locked after too many wrong passwords until {dateTime(lockedUntil)} UTC.</p>
+							<button type="submit" className="secondary">Unlock now</button>
+						</form>
+					)}
+					<table>
+						<tbody>
+							<tr><th>Password</th><td>{hasPassword ? 'set' : <span className="muted">none: signs in through the operator only</span>}</td></tr>
+							<tr><th>Last sign-in</th><td>{user.last_login_at ? dateTime(user.last_login_at) : <span className="muted">never</span>}</td></tr>
+							{user.pc_redirect_url && <tr><th>Operator site</th><td className="muted">{user.pc_redirect_url}</td></tr>}
+						</tbody>
+					</table>
+					<PasswordForm userId={id} hasPassword={hasPassword} />
+				</div>
 			</div>
 
 			<div className="panel scroll" id="transactions">

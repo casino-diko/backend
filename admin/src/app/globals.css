@@ -76,3 +76,5 @@ th a.sort { color: inherit; }
 th a.sort.on { color: var(--text); }
 .login { max-width: 340px; margin: 80px auto; }
 .filters { margin-bottom: 12px; }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+label.check input { width: auto; margin-top: 3px; }

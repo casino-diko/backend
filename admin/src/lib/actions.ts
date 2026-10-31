@@ -12,11 +12,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { adjustCredits, createUser } from './players';
+import { adjustCredits, createUser, setPassword, unlockUser } from './players';
 import { checkCredentials, endSession, requireAdmin, startSession } from './session';
 import { Invalid, parseAmount, parseNewUser } from './validate';
+import { rotateSecret } from './vendors';
 
-export type FormState = { error? : string; ok? : string } | null;
+export type FormState = { error? : string; ok? : string; secret? : string } | null;
 
 const failure = (e: unknown): FormState => {
 	if (e instanceof Invalid) return { error : e.message };
@@ -66,6 +67,38 @@ export async function adjustCreditsAction (_prev: FormState, form: FormData): Pr
 		revalidatePath('/');
 		if (duplicate) return { ok : `Already applied. Balance: ${balance.toLocaleString('en-US')}` };
 		return { ok : `${type === 'credit' ? 'Added' : 'Deducted'} ${amount.toLocaleString('en-US')}. New balance: ${balance.toLocaleString('en-US')}` };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+export async function setPasswordAction (_prev: FormState, form: FormData): Promise<FormState> {
+	await requireAdmin();
+	try {
+		const userId = Number(form.get('user_id'));
+		await setPassword(userId, String(form.get('password') ?? ''));
+		revalidatePath(`/users/${userId}`);
+		return { ok : 'Password set. The player can sign in with it now.' };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+export async function unlockAction (form: FormData) {
+	await requireAdmin();
+	const userId = Number(form.get('user_id'));
+	await unlockUser(userId);
+	revalidatePath(`/users/${userId}`);
+}
+
+export async function rotateSecretAction (_prev: FormState, form: FormData): Promise<FormState> {
+	const admin = await requireAdmin();
+	try {
+		const vendorId = Number(form.get('vendor_id'));
+		const secret = await rotateSecret(vendorId);
+		console.log(`[admin] ${admin} generated a new secret for vendor ${vendorId}`);
+		revalidatePath('/vendors');
+		return { ok : 'New secret saved. Copy it now: it is not shown again.', secret };
 	} catch (e) {
 		return failure(e);
 	}

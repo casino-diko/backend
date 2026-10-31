@@ -31,6 +31,9 @@ export const config = {
 		} as Record<Game, string>
 	},
 
+	// the player front-end as operators' players reach it: the base of launch links
+	playerSite : (env.PLAYER_SITE_URL || 'http://localhost:3000').replace(/\/+$/, ''),
+
 	admin : {
 		username : env.ADMIN_USERNAME || 'admin',
 		password : env.ADMIN_PASSWORD || ''

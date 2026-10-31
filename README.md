@@ -61,7 +61,7 @@ docker compose run --rm seed      # demo data: tables, dealers, players (only fi
 docker compose ps                 # all services should be "healthy"
 ```
 
-Open **http://localhost:3000/login**, pick a demo player and open a table from the lobby.
+Open **http://localhost:3000/login/dev**, pick a demo player and open a table from the lobby. Real players sign in at `/login` (password set in the admin) or arrive through an operator's `/launch` link, see [Player sign-in](#player-sign-in).
 
 | Service | URL / port | Health check |
 |---|---|---|
@@ -71,6 +71,15 @@ Open **http://localhost:3000/login**, pick a demo player and open a table from t
 | admin (back-office) | http://localhost:3001 (this machine only) | `/health` |
 | hls-dev | http://localhost:8080 (only with `COMPOSE_PROFILES=dev`) | `/health` |
 | mongo, redis | internal only | |
+
+### Player sign-in
+
+Players get into the games in two ways (details and the operator spec are in the web repo's README, section "Player sign-in"):
+
+- **Operator launch**: the operator's site sends the player to `/launch?vendor=…&payload=…&hash=…`, signed with the vendor's secret from the admin's **Vendors** page. The player is created on the first visit. To try it, generate a secret for `demo-transfer`, then in the web repo: `LAUNCH_SECRET=<secret> npm run launch-link -- --vendor demo-transfer --user p-1001 --game poker --table 1` and open the printed link (valid once, for 5 minutes).
+- **Password**: set a password on the admin player page; the player signs in at http://localhost:3000/login.
+
+`/login/dev` (pick any player) stays available with `DEV_LOGIN=true`.
 
 ### Admin
 
@@ -84,8 +93,9 @@ ADMIN_SESSION_SECRET=<output of: openssl rand -hex 32>
 
 - **Players**: search by login id, name or `#id`, filter by vendor.
 - **Add player**: vendor, login id (unique per vendor), display name, optional password (stored as an scrypt hash), currency, type, optional initial credits.
-- **Player page**: the balance, a form to add or deduct credits with a note, and the player's transactions: credit adjustments and bets from all three games (stake, payout, net; open rounds show the stake only).
-- **Transactions**: every credit adjustment, filterable by player and type.
+- **Player page**: the balance, a form to add or deduct credits with a note, sign-in (set or change the password, unlock after 5 wrong passwords, last sign-in), and the player's transactions: credit adjustments and bets from all three games, sortable, filterable and paged.
+- **Transactions**: every credit adjustment, sortable and filterable by player, type, admin and date.
+- **Vendors**: generate each operator's launch secret (shown once).
 
 Credits only exist for **transfer** vendors (balance in `users.money`). Seamless vendors hold the balance in their own wallet API, so their players can be created but not credited. Each adjustment is written to `nihtan_api.transactions` in the same MongoDB transaction as the balance change (who, amount, balance before and after); a resubmitted form is ignored. Deductions can't take a balance below 0.
 
@@ -198,7 +208,7 @@ Each service also documents its own variables in its `.env.example` (`game-serve
 ## Going to production
 
 - Set a strong `SESSION_SECRET`, keep `DEV_LOGIN=false`, set `SESSION_SECURE=true` behind https, and set a `REDIS_PASSWORD`.
-- Players can't log in yet: only the development login exists. A vendor launch flow (signed redirect that creates the session) still has to be built.
+- Give each operator a launch secret (admin **Vendors** page) and set `PLAYER_SITE_URL` to the player site's public url.
 - Point each table's video at your HLS CDN (`env_setting.hls` or `HLS_URL_TEMPLATE`). The CDN must send CORS headers.
 - `PUBLIC_SOCKET_URL` must be the public URL of the socket-server.
 - Run MongoDB as a proper replica set with backups instead of the single node of the compose file.

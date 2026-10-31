@@ -119,6 +119,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
       ADMIN_SESSION_SECURE: ${ADMIN_SESSION_SECURE:-false}
+      # the player site as operators' players reach it (shown in launch link instructions)
+      PLAYER_SITE_URL: ${PLAYER_SITE_URL:-http://localhost:3000}
     ports:
       - "${ADMIN_BIND:-127.0.0.1}:${ADMIN_PORT:-3001}:3001"
     depends_on:

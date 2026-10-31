@@ -12,6 +12,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { parseName, removeFile, saveFile, setName } from './brand';
 import { adjustCredits, createUser, setPassword, unlockUser } from './players';
 import { checkCredentials, endSession, requireAdmin, startSession } from './session';
 import { Invalid, parseAmount, parseNewUser } from './validate';
@@ -125,4 +126,40 @@ export async function lobbyTypeAction (form: FormData) {
 	await setLobbyType(vendorId, integrated);
 	console.log(`[admin] ${admin} set the lobby of vendor ${vendorId} to ${integrated ? 'integrated' : 'normal'}`);
 	revalidatePath('/vendors');
+}
+
+export async function brandNameAction (_prev: FormState, form: FormData): Promise<FormState> {
+	const admin = await requireAdmin();
+	try {
+		const name = parseName(form.get('name'));
+		await setName(name);
+		console.log(`[admin] ${admin} renamed the brand to ${name}`);
+		revalidatePath('/', 'layout');
+		return { ok : `Saved. The player site shows "${name}" within a few seconds.` };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+export async function brandFileAction (_prev: FormState, form: FormData): Promise<FormState> {
+	const admin = await requireAdmin();
+	try {
+		const id = String(form.get('id') ?? '');
+		const file = form.get('file');
+		if (!(file instanceof File) || !file.size) throw new Invalid('Choose a file first');
+		await saveFile(id, Buffer.from(await file.arrayBuffer()), file.name, admin);
+		console.log(`[admin] ${admin} uploaded brand file ${id} (${file.name}, ${file.size} bytes)`);
+		revalidatePath('/branding');
+		return { ok : 'Uploaded.' };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+export async function brandRemoveAction (form: FormData) {
+	const admin = await requireAdmin();
+	const id = String(form.get('id') ?? '');
+	await removeFile(id);
+	console.log(`[admin] ${admin} removed brand file ${id}`);
+	revalidatePath('/branding');
 }

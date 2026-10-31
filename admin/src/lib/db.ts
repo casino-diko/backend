@@ -61,6 +61,9 @@ const sharedModels = (conn: Connection) => ({
 	users        : model(conn, 'user', () => schema('users', { vendor_id : Number, user_id : String, user_name : String, money : Number, currency : String })),
 	vendors      : model(conn, 'vendor', () => schema('vendors', { vendor_name : String, integration_type : String, currency : String })),
 	transactions : model(conn, 'transaction', transactionSchema),
+	// the brand the player site shows (lib/brand.ts; the web repo's src/lib/brand.ts reads them)
+	settings     : model(conn, 'setting', () => new Schema({ _id : String }, { collection : 'settings', strict : false, versionKey : false })),
+	brandFiles   : model(conn, 'brand_file', () => new Schema({ _id : String, content_type : String, data : Buffer, version : Number }, { collection : 'brand_files', strict : false, versionKey : false })),
 	nextId       : counter(conn)
 });
 

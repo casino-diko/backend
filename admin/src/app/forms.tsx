@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { adjustCreditsAction, createUserAction, embedOriginsAction, login, rotateSecretAction, setPasswordAction, type FormState } from '@/lib/actions';
+import { adjustCreditsAction, brandFileAction, brandNameAction, createUserAction, embedOriginsAction, login, rotateSecretAction, setPasswordAction, type FormState } from '@/lib/actions';
 
 const Message = ({ state }: { state : FormState }) => (
 	<>
@@ -146,6 +146,30 @@ export function EmbedOriginsForm ({ vendorId, origins }: { vendorId : number; or
 				<textarea name="origins" rows={Math.max(2, origins.length + 1)} defaultValue={origins.join('\n')} spellCheck={false} />
 			</label>
 			<button type="submit" className="secondary" disabled={pending}>{pending ? 'Saving…' : 'Save sites'}</button>
+		</form>
+	);
+}
+
+export function BrandNameForm ({ name }: { name : string }) {
+	const [state, action, pending] = useActionState(brandNameAction, null);
+	return (
+		<form action={action} className="row">
+			<label>Brand name<input name="name" defaultValue={name} required maxLength={40} autoComplete="off" /></label>
+			<button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save name'}</button>
+			<div style={{ flexBasis : '100%' }}><Message state={state} /></div>
+		</form>
+	);
+}
+
+/** one upload slot: logo, icon or a welcome sound */
+export function BrandUploadForm ({ id, accept, label }: { id : string; accept : string; label : string }) {
+	const [state, action, pending] = useActionState(brandFileAction, null);
+	return (
+		<form action={action} className="row upload">
+			<input type="hidden" name="id" value={id} />
+			<label>{label}<input type="file" name="file" accept={accept} required /></label>
+			<button type="submit" className="secondary" disabled={pending}>{pending ? 'Uploading…' : 'Upload'}</button>
+			<div style={{ flexBasis : '100%' }}><Message state={state} /></div>
 		</form>
 	);
 }

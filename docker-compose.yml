@@ -99,6 +99,8 @@ services:
       SESSION_SECURE: ${SESSION_SECURE:-false}
       API_URL: ${VENDOR_API_URL:-}
       DEV_LOGIN: ${DEV_LOGIN:-false}
+      # name of the home-screen app on phones
+      APP_NAME: ${APP_NAME:-Nihtan}
       # HLS live video per table when game_tables.env_setting.hls is not set, see web/src/lib/video.ts
       HLS_URL_TEMPLATE: ${HLS_URL_TEMPLATE:-}
     ports:

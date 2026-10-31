@@ -186,7 +186,8 @@ The smoke scripts connect to MongoDB and Redis directly and use the same environ
 | Variable | Default | |
 |---|---|---|
 | `SESSION_SECRET` | none, **required** | signs the players' session cookie (32+ characters) |
-| `DEV_LOGIN` | `false` | `true` enables `/login` to pick any player. **Never in production.** |
+| `DEV_LOGIN` | `false` | `true` enables `/login/dev` to pick any player. **Never in production.** |
+| `APP_NAME` | `Nihtan` | name of the home-screen app on phones |
 | `SESSION_SECURE` | `false` | `true` when the site is served over https |
 | `WEB_PORT` / `SOCKET_SERVER_PORT` | `3000` / `8000` | host ports |
 | `BACCARAT_PORT` / `DRAGONTIGER_PORT` / `POKER_PORT` | `8007` / `8008` / `8009` | dealer page ports |

@@ -119,12 +119,13 @@ const PROTOCOL = {
 				}
 			};
 			// players decide on each street while its timer runs (flop bet / fold, then turn, then river);
-			// the dealer's hand is scanned last
-			await scan('burn', 'player', 'player', 'burn', 'flop', 'flop', 'flop');
+			// one burn card before each street, the dealer's hand is scanned last. The player pages count
+			// the burn cards (1 at the flop, 2 at the turn, 3 at the river) to time fold / check
+			await scan('player', 'player', 'burn', 'flop', 'flop', 'flop');
 			await countdown(STREET_SECONDS, 'flop');
 			await scan('burn', 'turn');
 			await countdown(STREET_SECONDS, 'turn');
-			await scan('river');
+			await scan('burn', 'river');
 			await countdown(STREET_SECONDS, 'river');
 			await scan('dealer', 'dealer');
 		},

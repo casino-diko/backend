@@ -1,6 +1,6 @@
 #!/bin/sh
 # One ffmpeg process encodes a 640x360 live placeholder stream per table (felt-green background,
-# table name, clock) into /srv/hls/<app>-<table>.m3u8
+# table name, clock, silent audio track) into /srv/hls/<app>-<table>.m3u8
 # (matches HLS_URL_TEMPLATE=http://localhost:8080/hls/{app}-{table}.m3u8), then nginx serves them.
 set -e
 TABLES="${TABLES:-baccarat-1 baccarat-2 dragon-tiger-1 dragon-tiger-2 poker-1 poker-2}"
@@ -21,7 +21,7 @@ done
 
 ffmpeg -hide_banner -loglevel warning -re \
 	-f lavfi -i "gradients=size=640x360:rate=25:c0=0x1d6b4a:c1=0x05231a:type=radial:x0=320:y0=150:x1=0:y1=360:speed=0.002" \
-	-f lavfi -i "sine=frequency=330:sample_rate=44100,volume=0.05" \
+	-f lavfi -i "anullsrc=channel_layout=stereo:sample_rate=44100" \
 	-filter_complex "[0:v]split=$n$split_v;[1:a]asplit=$n$split_a$filters" \
 	$maps &
 

@@ -108,6 +108,24 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # back-office (Next.js): create players, add credits, player transactions. Only reachable from
+  # this machine unless ADMIN_BIND is changed; login with ADMIN_USERNAME / ADMIN_PASSWORD
+  admin:
+    build: ./admin
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_SHARED_DB: nihtan_api
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
+      ADMIN_SESSION_SECURE: ${ADMIN_SESSION_SECURE:-false}
+    ports:
+      - "${ADMIN_BIND:-127.0.0.1}:${ADMIN_PORT:-3001}:3001"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
   # development only: fake live HLS video for every table (enable with COMPOSE_PROFILES=dev and
   # HLS_URL_TEMPLATE=http://localhost:8080/hls/{app}-{table}.m3u8)
   hls-dev:

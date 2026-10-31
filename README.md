@@ -12,6 +12,7 @@ dealer page ──socket.io──▶ game-server ──redis `game-servers`─�
 |---|---|---|
 | **game-server** | `game-server/` | One process hosting every game, each on its own port (8007 baccarat, 8008 dragon-tiger, 8009 poker). Dealer pages (card scanners) connect to it. Stores rounds, bets and road maps in MongoDB, settles bets, publishes every game event to Redis. |
 | **socket-server** | `socket-server/` | Clustered socket.io gateway relaying game events to players in per-table namespaces (`/<Game>/<table>`, `/all`, `/managers`). See [socket-server/readme.md](socket-server/readme.md). |
+| **admin** | `admin/` | Next.js back-office: add players, add or deduct credits, every player's transactions (credit adjustments and game bets). See [Admin](#admin). |
 | **web** | separate repo [casino-diko/web](https://github.com/casino-diko/web) | Next.js player front-end: lobby at `/`, games at `/baccarat`, `/dragon-tiger`, `/poker`. Places bets into the same MongoDB. |
 | MongoDB 7, Redis 7 | Docker | MongoDB runs as a single-node replica set, because bet settlement uses transactions. |
 
@@ -67,8 +68,30 @@ Open **http://localhost:3000/login**, pick a demo player and open a table from t
 | web (front-end) | http://localhost:3000 | `/health` |
 | socket-server | http://localhost:8000 | `/health` |
 | game-server | 8007 baccarat, 8008 dragon-tiger, 8009 poker (dealer pages) | `/health` on each port |
+| admin (back-office) | http://localhost:3001 (this machine only) | `/health` |
 | hls-dev | http://localhost:8080 (only with `COMPOSE_PROFILES=dev`) | `/health` |
 | mongo, redis | internal only | |
+
+### Admin
+
+The back-office at **http://localhost:3001**. Set its login in `.env` first, then `docker compose up -d --build admin`:
+
+```sh
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<a strong password>
+ADMIN_SESSION_SECRET=<output of: openssl rand -hex 32>
+```
+
+- **Players**: search by login id, name or `#id`, filter by vendor.
+- **Add player**: vendor, login id (unique per vendor), display name, optional password (stored as an scrypt hash), currency, type, optional initial credits.
+- **Player page**: the balance, a form to add or deduct credits with a note, and the player's transactions: credit adjustments and bets from all three games (stake, payout, net; open rounds show the stake only).
+- **Transactions**: every credit adjustment, filterable by player and type.
+
+Credits only exist for **transfer** vendors (balance in `users.money`). Seamless vendors hold the balance in their own wallet API, so their players can be created but not credited. Each adjustment is written to `nihtan_api.transactions` in the same MongoDB transaction as the balance change (who, amount, balance before and after); a resubmitted form is ignored. Deductions can't take a balance below 0.
+
+The port is bound to `127.0.0.1`. To reach it from elsewhere set `ADMIN_BIND=0.0.0.0`, but only behind https with `ADMIN_SESSION_SECURE=true`.
+
+Local development: `cd admin && cp .env.example .env && npm install && npm run dev` (needs MongoDB reachable at `MONGO_URI`); `npm test` runs the validation tests.
 
 ### Play rounds without real dealers
 
@@ -165,6 +188,10 @@ The smoke scripts connect to MongoDB and Redis directly and use the same environ
 | `HLS_URL_TEMPLATE` | empty | live video url per table, placeholders `{app}` `{game}` `{table}` `{table2}` `{quality}`; a table's `env_setting.hls` takes precedence |
 | `COMPOSE_PROFILES` | empty | `dev` also starts the fake video streams (`hls-dev`) |
 | `GAME_FRONT_DIR` | `../web` | where the front-end repository is checked out |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / empty | back-office login; the admin refuses logins until a password is set |
+| `ADMIN_SESSION_SECRET` | empty | signs the admin session cookie (32+ characters), required to log in |
+| `ADMIN_SESSION_SECURE` | `false` | `true` when the admin is served over https |
+| `ADMIN_PORT` / `ADMIN_BIND` | `3001` / `127.0.0.1` | admin host port and the interface it listens on |
 
 Each service also documents its own variables in its `.env.example` (`game-server/`, `socket-server/`).
 

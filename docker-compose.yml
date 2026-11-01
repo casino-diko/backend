@@ -115,6 +115,8 @@ services:
   admin:
     build: ./admin
     environment:
+      # voiding a round tells the table's players (redis `game-servers`, like the game-server)
+      <<: *redis-env
       MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
       MONGO_SHARED_DB: nihtan_api
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
@@ -127,6 +129,8 @@ services:
       - "${ADMIN_BIND:-127.0.0.1}:${ADMIN_PORT:-3001}:3001"
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

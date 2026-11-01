@@ -10,19 +10,24 @@
  | from each source in full.
  |
  | A bet counts once its round is resulted (status E): change = payout -
- | stake. Before that it is open: change = -stake, no payout.
+ | stake. Before that it is open: change = -stake, no payout. A cancelled
+ | round's bet (C) stays at -stake: the game-server's `refund` transaction
+ | gives it back. A voided round's bet (V) keeps what was paid (payout -
+ | stake): the admin's signed `rollback` transaction undoes it. So the rows
+ | always add up to the balance changes.
  |
  */
 
 import { GAME_LABELS, type Game } from './config';
 import { getDb } from './db';
 import { dateRange } from './listQuery';
+import { CHANGE } from './transactions';
 import { activitySources, compareRows, type ActivityQuery, type Sort } from './activityQuery';
 
 export type Activity = {
 	key      : string;
 	at       : Date;
-	kind     : 'credit' | 'debit' | 'bet';
+	kind     : 'credit' | 'debit' | 'refund' | 'rollback' | 'bet';
 	label    : string;
 	detail   : string;
 	stake    : number | null;
@@ -45,7 +50,14 @@ export type ActivityResult = {
 
 const SORT_FIELDS: Record<Sort, string> = { time : 'created_at', stake : 'stake', payout : 'payout', change : 'change' };
 
-const ROUND_STATUS: Record<string, string> = { S : 'betting', P : 'dealing', H : 'on hold', E : 'resulted' };
+const ROUND_STATUS: Record<string, string> = { S : 'betting', P : 'dealing', H : 'on hold', E : 'resulted', C : 'cancelled', V : 'voided' };
+
+const TX_LABELS: Record<string, string> = {
+	credit   : 'Credit added',
+	debit    : 'Credit deducted',
+	refund   : 'Refund: round cancelled',
+	rollback : 'Rollback: round voided'
+};
 
 const num = (path: string) => ({ $convert : { input : path, to : 'double', onError : 0, onNull : 0 } });
 
@@ -60,25 +72,22 @@ function creditSource (db: Awaited<ReturnType<typeof getDb>>, userId: number, qu
 	const match: any = { user_id : userId };
 	const created = dateRange(query);
 	if (created) match.created_at = created;
-	if (query.outcome === 'gain') match.type = 'credit';
-	if (query.outcome === 'loss') match.type = 'debit';
 
 	return {
 		name : 'credits',
 		run  : stages => db.shared.transactions.aggregate(stages),
 		base : [
 			{ $match : match },
-			{ $set : {
-				stake  : null,
-				payout : null,
-				change : { $cond : [{ $eq : ['$type', 'credit'] }, '$amount', { $multiply : ['$amount', -1] }] }
-			} }
+			{ $set : { stake : null, payout : null, change : CHANGE } },
+			...(query.outcome === 'gain' ? [{ $match : { change : { $gt : 0 } } }]
+				: query.outcome === 'loss' ? [{ $match : { change : { $lt : 0 } } }]
+				: [])
 		],
 		map  : t => ({
 			key     : `tx-${t._id}`,
 			at      : t.created_at,
 			kind    : t.type,
-			label   : t.type === 'credit' ? 'Credit added' : 'Credit deducted',
+			label   : TX_LABELS[t.type] || t.type,
 			detail  : t.note || '',
 			stake   : null,
 			payout  : null,
@@ -107,10 +116,16 @@ function betSource (db: Awaited<ReturnType<typeof getDb>>, game: Game, userId: n
 			{ $match : match },
 			{ $lookup : { from : 'rounds', localField : 'round_id', foreignField : '_id', as : 'round', pipeline : [{ $project : { status : 1, table_id : 1, round_num : 1 } }] } },
 			{ $set : { round : { $first : '$round' }, stake : num('$total_bet') } },
-			{ $set : { open : { $ne : ['$round.status', 'E'] } } },
+			{ $set : { open : { $not : [{ $in : ['$round.status', ['E', 'C', 'V']] }] } } },
+			// paid at settlement: E total_win, V what was paid before the void; a cancelled round paid nothing
+			{ $set : { paid : { $switch : { branches : [
+				{ case : { $eq : ['$round.status', 'E'] }, then : num('$total_win') },
+				{ case : { $eq : ['$round.status', 'V'] }, then : num('$reversed') },
+				{ case : { $eq : ['$round.status', 'C'] }, then : 0 }
+			], default : null } } } },
 			{ $set : {
-				payout : { $cond : ['$open', null, num('$total_win')] },
-				change : { $cond : ['$open', { $multiply : ['$stake', -1] }, { $subtract : [num('$total_win'), '$stake'] }] }
+				payout : '$paid',
+				change : { $subtract : [{ $ifNull : ['$paid', 0] }, '$stake'] }
 			} },
 			...(outcome ? [{ $match : outcome }] : [])
 		],

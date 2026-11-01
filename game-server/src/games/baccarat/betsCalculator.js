@@ -93,7 +93,8 @@ module.exports = {
             // append the mark to the table's current road map (latest shoe)
             return models.gameMarks.findOneAndUpdate(
                 { table_id : tableId },
-                { $push : { mark : { natural : result.natural, num : winValue, mark : markData } } },
+                // round_id: lets a void (admin) take exactly this round's mark off the road map
+                { $push : { mark : { round_id : round._id, natural : result.natural, num : winValue, mark : markData } } },
                 { session, sort : { _id : -1 }, new : true, projection : { table_id : 1, mark_num : 1 } }
             ).lean();
         });

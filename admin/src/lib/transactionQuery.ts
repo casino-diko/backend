@@ -14,9 +14,11 @@ export { dayParam, PAGE_SIZES } from './listQuery.ts';
 export const SORTS = ['time', 'change', 'balance', 'admin'] as const;
 export type Sort = typeof SORTS[number];
 
+export const TYPES = ['credit', 'debit', 'refund', 'rollback'] as const;
+
 export type ListQuery = Paging<Sort> & {
 	q     : string;          // player: login id, name or #id
-	type  : '' | 'credit' | 'debit';
+	type  : '' | typeof TYPES[number];
 	admin : string;
 };
 
@@ -26,7 +28,7 @@ export function parseListQuery (params: Params): ListQuery {
 	const paging = parsePaging(params, SORTS, 'time');
 	return {
 		q     : first(params.q).slice(0, 100),
-		type  : oneOf(first(params.type), ['credit', 'debit'] as const),
+		type  : oneOf(first(params.type), TYPES),
 		admin : first(params.admin).slice(0, 100),
 		from  : paging.from,
 		to    : paging.to,

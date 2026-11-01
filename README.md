@@ -94,9 +94,12 @@ ADMIN_SESSION_SECRET=<output of: openssl rand -hex 32>
 - **Players**: search by login id, name or `#id`, filter by vendor.
 - **Add player**: vendor, login id (unique per vendor), display name, optional password (stored as an scrypt hash), currency, type, optional initial credits.
 - **Player page**: the balance, a form to add or deduct credits with a note, sign-in (set or change the password, unlock after 5 wrong passwords, last sign-in), and the player's transactions: credit adjustments and bets from all three games, sortable, filterable and paged.
-- **Transactions**: every credit adjustment, sortable and filterable by player, type, admin and date.
+- **Transactions**: every balance change: credit adjustments, refunds of cancelled rounds and rollbacks of voided ones, sortable and filterable by player, type, admin and date.
+- **Rounds**: every round of every table, with its result, players, bets, winnings paid, house net and refunds; filtered by game, table, status (successful, cancelled, voided, in progress), dealer, round number and date, sortable and paged. A round's page shows its cards, its bets per player and, for a successful round, **Void**: a preview of every player's balance change, then one transaction that undoes the round (stakes back, winnings taken back; a balance may go below 0), takes its mark off the road map and tells the table's players (redis `game-servers`). Seamless players' rollbacks are queued in `vendor_calls` for their vendor.
 - **Branding**: the brand name (default Diko), logo, icon and the lobby's welcome sound per language; the player site shows them within seconds (texts, logos, icons, favicons).
 - **Vendors**: each operator's launch secret (generated, shown once), the sites allowed to embed the games in an iframe, and the lobby mode (our lobby, or the operator's: the games' lobby button returns players to the operator). The operator guide is `OPERATORS.md` in the web repo.
+
+Rounds are cancelled at the table (dealer event `cancelround` with a supervisor badge, game-server `core/tableControl.js`): every stake goes back, transfer players at once with a `refund` transaction.
 
 Credits only exist for **transfer** vendors (balance in `users.money`). Seamless vendors hold the balance in their own wallet API, so their players can be created but not credited. Each adjustment is written to `nihtan_api.transactions` in the same MongoDB transaction as the balance change (who, amount, balance before and after); a resubmitted form is ignored. Deductions can't take a balance below 0.
 

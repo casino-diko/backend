@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { adjustCreditsAction, brandFileAction, brandNameAction, createUserAction, embedOriginsAction, login, rotateSecretAction, setPasswordAction, type FormState } from '@/lib/actions';
+import { adjustCreditsAction, brandFileAction, brandNameAction, createUserAction, embedOriginsAction, login, rotateSecretAction, setPasswordAction, voidRoundAction, type FormState } from '@/lib/actions';
 
 const Message = ({ state }: { state : FormState }) => (
 	<>
@@ -157,6 +157,33 @@ export function BrandNameForm ({ name }: { name : string }) {
 			<label>Brand name<input name="name" defaultValue={name} required maxLength={40} autoComplete="off" /></label>
 			<button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save name'}</button>
 			<div style={{ flexBasis : '100%' }}><Message state={state} /></div>
+		</form>
+	);
+}
+
+/** voids a resulted round; the page shows every balance change above it */
+export function VoidForm ({ game, roundId }: { game : string; roundId : number }) {
+	const [state, action, pending] = useActionState(voidRoundAction, null);
+	if (state?.ok) return <p className="ok" role="status">{state.ok}</p>;
+	return (
+		<form action={action}>
+			{state?.error && <p className="error" role="alert">{state.error}</p>}
+			<input type="hidden" name="game" value={game} />
+			<input type="hidden" name="round_id" value={roundId} />
+			<label>Reason <small>(kept on the round and every player&apos;s transaction)</small>
+				<input name="reason" list="void-reasons" required minLength={3} maxLength={200} autoComplete="off" />
+				<datalist id="void-reasons">
+					<option value="Wrong card scanned" />
+					<option value="Misdeal found on video" />
+					<option value="Duplicate card in shoe" />
+					<option value="Scanner fault" />
+				</datalist>
+			</label>
+			<label className="check">
+				<input type="checkbox" name="confirm" required />
+				<span>I checked the balance changes above. They are applied at once and can&apos;t be undone.</span>
+			</label>
+			<button type="submit" className="danger" disabled={pending}>{pending ? 'Voiding…' : 'Void this round'}</button>
 		</form>
 	);
 }

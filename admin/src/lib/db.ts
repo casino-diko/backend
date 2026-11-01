@@ -8,9 +8,11 @@
  | non-strict because the player front-end stores extra fields on users.
  |
  | `transactions` (shared database) is owned by this service: one document
- | per credit adjustment, written in the same MongoDB transaction as the
+ | per balance change, written in the same MongoDB transaction as the
  | users.money change. `request_id` is unique so a resubmitted form can't
- | apply the same adjustment twice.
+ | apply the same adjustment twice. Types: credit / debit (admin), refund
+ | (game-server, a cancelled round's stake) and rollback (a voided round:
+ | `amount` is signed, stake - payout).
  |
  */
 
@@ -44,7 +46,7 @@ const counter = (conn: Connection) => {
 const transactionSchema = () => schema('transactions', {
 	user_id        : { type : Number, required : true },
 	vendor_id      : Number,
-	type           : { type : String, enum : ['credit', 'debit'], required : true },
+	type           : { type : String, enum : ['credit', 'debit', 'refund', 'rollback'], required : true },
 	amount         : { type : Number, required : true },
 	balance_before : Number,
 	balance_after  : Number,
@@ -61,6 +63,9 @@ const sharedModels = (conn: Connection) => ({
 	users        : model(conn, 'user', () => schema('users', { vendor_id : Number, user_id : String, user_name : String, money : Number, currency : String })),
 	vendors      : model(conn, 'vendor', () => schema('vendors', { vendor_name : String, integration_type : String, currency : String })),
 	transactions : model(conn, 'transaction', transactionSchema),
+	dealers      : model(conn, 'dealer', () => schema('dealers', { name : String, real_name : String, code : String })),
+	// seamless wallet refund / rollback calls queued for the vendors' APIs (game-server core/tableControl)
+	vendorCalls  : model(conn, 'vendor_call', () => new Schema({ _id : String }, { collection : 'vendor_calls', strict : false, versionKey : false, timestamps : { createdAt : 'created_at', updatedAt : 'updated_at' } })),
 	// the brand the player site shows (lib/brand.ts; the web repo's src/lib/brand.ts reads them)
 	settings     : model(conn, 'setting', () => new Schema({ _id : String }, { collection : 'settings', strict : false, versionKey : false })),
 	brandFiles   : model(conn, 'brand_file', () => new Schema({ _id : String, content_type : String, data : Buffer, version : Number }, { collection : 'brand_files', strict : false, versionKey : false })),
@@ -70,7 +75,10 @@ const sharedModels = (conn: Connection) => ({
 const gameModels = (conn: Connection) => ({
 	tables : model(conn, 'game_table', () => schema('game_tables', { game_name : String })),
 	rounds : model(conn, 'round', () => schema('rounds', { table_id : Number, round_num : Number, status : String })),
-	bets   : model(conn, 'bet', () => schema('bets', { round_id : Number, user_id : Number, total_bet : Number, total_win : Number }))
+	bets   : model(conn, 'bet', () => schema('bets', { round_id : Number, user_id : Number, total_bet : Number, total_win : Number })),
+	// road map: baccarat / dragon-tiger one document per shoe (`mark` entries carry round_id since
+	// voids exist), poker one per round
+	gameMarks : model(conn, 'game_mark', () => schema('game_marks', { table_id : Number, round_id : Number }))
 });
 
 type Shared = ReturnType<typeof sharedModels>;

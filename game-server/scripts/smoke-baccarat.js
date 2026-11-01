@@ -186,7 +186,7 @@ async function main () {
 		assert.equal(after1.money, user1.money + 320, 'transfer user credited');
 		assert.equal(after3.money, user3.money, 'seamless user untouched');
 		const marks = await models.gameMarks.findById(shoe._id).lean();
-		assert.deepEqual(marks.mark, [{ natural : ['player'], num : 8, mark : 'h' }]);
+		assert.deepEqual(marks.mark, [{ round_id : round.id, natural : ['player'], num : 8, mark : 'h' }]);
 
 		step('second displayresults is refused (no double payout)');
 		assert.equal(await push('displayresults'), false);

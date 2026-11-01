@@ -284,7 +284,7 @@ async function main () {
 
 	const marksAfter = (await models.gameMarks.findById(shoe._id).lean()).mark;
 	assert.equal(marksAfter.length, marksBefore + 1);
-	assert.deepEqual(marksAfter[marksAfter.length - 1], { num : 13, mark : 'b' });
+	assert.deepEqual(marksAfter[marksAfter.length - 1], { round_id : r._id, num : 13, mark : 'b' });
 	ok(`round E, bets settled, user 1 ${u1.money} -> ${v1.money}, user 3 unchanged, road map mark added`);
 
 	const again = await push({ event : 'displayresults' });

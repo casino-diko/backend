@@ -155,7 +155,7 @@ export default async function UserPage ({ params, searchParams }: Props) {
 					</tbody>
 				</table>
 				<Pager page={result.page} pages={result.pages} size={query.size} total={result.total} shown={result.rows.length} href={page => href({ page })} />
-				<p className="muted">Open bets show the stake only; once the round is resulted the change is payout − stake.</p>
+				<p className="muted">Open bets show the stake only; once the round is resulted the change is payout − stake. A cancelled round's stake comes back as a refund, and a voided round is undone by a rollback: both show under credits.</p>
 			</div>
 		</>
 	);

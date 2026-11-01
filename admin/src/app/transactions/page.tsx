@@ -17,7 +17,7 @@ export default async function TransactionsPage ({ searchParams }: Props) {
 
 	return (
 		<>
-			<h1>Credit transactions</h1>
+			<h1>Transactions</h1>
 			<form className="panel row" method="get">
 				<label>Player<input name="q" defaultValue={query.q} placeholder="login id, name or #id" /></label>
 				<label>Type
@@ -25,6 +25,8 @@ export default async function TransactionsPage ({ searchParams }: Props) {
 						<option value="">all</option>
 						<option value="credit">added</option>
 						<option value="debit">deducted</option>
+						<option value="refund">cancelled round refund</option>
+						<option value="rollback">voided round rollback</option>
 					</select>
 				</label>
 				<label>By
@@ -50,7 +52,8 @@ export default async function TransactionsPage ({ searchParams }: Props) {
 			<div className="panel scroll">
 				<p className="muted">
 					{result.total.toLocaleString('en-US')} transaction{result.total === 1 ? '' : 's'}{filtered ? ' match' : ''}:{' '}
-					<span className="pos">{signed(result.credit)}</span> added, <span className="neg">{signed(-result.debit)}</span> deducted.
+					<span className="pos">{signed(result.credit)}</span> added, <span className="neg">{signed(-result.debit)}</span> deducted
+					{result.rounds !== 0 && <>, <span className={result.rounds < 0 ? 'neg' : 'pos'}>{signed(result.rounds)}</span> from cancelled or voided rounds</>}.
 					Game bets of a player are on the player&apos;s page.
 				</p>
 				<table>
@@ -73,10 +76,10 @@ export default async function TransactionsPage ({ searchParams }: Props) {
 									<td>{r._id}</td>
 									<td className="muted">{dateTime(r.created_at)}</td>
 									<td><Link href={`/users/${r.user_id}`}>{u ? `${u.user_id} · ${u.user_name}` : `#${r.user_id}`}</Link></td>
-									<td className={`num ${r.change > 0 ? 'pos' : 'neg'}`}>{signed(r.change)} <span className="muted">{r.currency}</span></td>
-									<td className="num">{money(r.balance_after)}</td>
-									<td>{r.note}</td>
-									<td className="muted">{r.admin}</td>
+									<td className={`num ${r.change > 0 ? 'pos' : r.change < 0 ? 'neg' : ''}`}>{signed(r.change)} <span className="muted">{r.currency}</span></td>
+									<td className={`num${r.balance_after < 0 ? ' neg' : ''}`}>{money(r.balance_after)}</td>
+									<td>{r.round_id && r.game ? <Link href={`/rounds/${r.game}/${r.round_id}`}>{r.note}</Link> : r.note}</td>
+									<td className="muted">{r.admin || (r.type === 'refund' ? 'table' : '')}</td>
 								</tr>
 							);
 						})}

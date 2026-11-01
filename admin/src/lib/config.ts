@@ -31,6 +31,13 @@ export const config = {
 		} as Record<Game, string>
 	},
 
+	// the game-server's redis: a void is published on `game-servers` for the table's players
+	redis : {
+		host     : env.REDIS_HOST || '127.0.0.1',
+		port     : Number(env.REDIS_PORT || 6379),
+		password : env.REDIS_PASSWORD || undefined
+	},
+
 	// the player front-end as operators' players reach it: the base of launch links
 	playerSite : (env.PLAYER_SITE_URL || 'http://localhost:3000').replace(/\/+$/, ''),
 

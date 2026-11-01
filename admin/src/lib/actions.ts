@@ -17,6 +17,8 @@ import { adjustCredits, createUser, setPassword, unlockUser } from './players';
 import { checkCredentials, endSession, requireAdmin, startSession } from './session';
 import { Invalid, parseAmount, parseNewUser } from './validate';
 import { parseEmbedOrigins, rotateSecret, setEmbedOrigins, setLobbyType } from './vendors';
+import { GAMES, type Game } from './config';
+import { voidRound } from './rounds';
 
 export type FormState = { error? : string; ok? : string; secret? : string } | null;
 
@@ -151,6 +153,34 @@ export async function brandFileAction (_prev: FormState, form: FormData): Promis
 		console.log(`[admin] ${admin} uploaded brand file ${id} (${file.name}, ${file.size} bytes)`);
 		revalidatePath('/branding');
 		return { ok : 'Uploaded.' };
+	} catch (e) {
+		return failure(e);
+	}
+}
+
+/** voids a resulted round: every bet rolled back (lib/rounds.ts) */
+export async function voidRoundAction (_prev: FormState, form: FormData): Promise<FormState> {
+	const admin = await requireAdmin();
+	try {
+		const game = String(form.get('game') ?? '') as Game;
+		const roundId = Number(form.get('round_id'));
+		if (!GAMES.includes(game) || !Number.isInteger(roundId) || roundId <= 0) throw new Invalid('Round not found');
+		const reason = String(form.get('reason') ?? '').trim().replace(/\s+/g, ' ');
+		if (reason.length < 3) throw new Invalid('Give the reason for the void');
+		if (reason.length > 200) throw new Invalid('Keep the reason under 200 characters');
+		if (form.get('confirm') !== 'on') throw new Invalid('Tick the box to confirm the balance changes');
+
+		const r = await voidRound(game, roundId, reason, admin);
+		console.log(`[admin] ${admin} voided ${game} round #${roundId} (${r.roundNum}): ${reason}`);
+		revalidatePath('/rounds');
+		revalidatePath(`/rounds/${game}/${roundId}`);
+		revalidatePath('/transactions');
+		revalidatePath('/');
+		const players = new Set(r.rows.map(x => x.userId)).size;
+		const told = r.told === 'road map' ? 'Players at the table were told and their road maps updated.'
+			: r.told === 'notice' ? 'Players at the table were told; their road maps update on their next visit.'
+			: 'The players could not be told right away (redis unreachable); they see it on their next visit.';
+		return { ok : `Round ${r.roundNum} voided: ${players} player${players === 1 ? '' : 's'} reversed. ${r.mark === 'removed' ? 'Its mark is off the road map.' : 'No road map mark was found for it.'} ${told}` };
 	} catch (e) {
 		return failure(e);
 	}

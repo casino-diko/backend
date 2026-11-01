@@ -21,6 +21,7 @@ export default async function RootLayout ({ children }: { children : React.React
 							<Link href="/">Players</Link>
 							<Link href="/users/new">Add player</Link>
 							<Link href="/transactions">Transactions</Link>
+							<Link href="/rounds">Rounds</Link>
 							<Link href="/vendors">Vendors</Link>
 							<Link href="/branding">Branding</Link>
 						</nav>

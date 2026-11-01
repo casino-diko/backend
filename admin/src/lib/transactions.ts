@@ -2,8 +2,9 @@
  |--------------------------------------------------------------------------
  | transactions list
  |--------------------------------------------------------------------------
- | Filters, sorts and pages the credit adjustments (`transactions`) for a
- | query from transactionQuery.ts. Sorting by time uses _id, which grows
+ | Filters, sorts and pages the balance changes (`transactions`: admin
+ | credits / debits, cancelled rounds' refunds, voided rounds' rollbacks) for
+ | a query from transactionQuery.ts. Sorting by time uses _id, which grows
  | with created_at; every other sort falls back to _id so equal values keep
  | a stable order across pages.
  |
@@ -16,8 +17,14 @@ import type { ListQuery, Sort } from './transactionQuery';
 
 const SORT_FIELDS: Record<Sort, string> = { time : '_id', change : 'change', balance : 'balance_after', admin : 'admin' };
 
-// signed amount: credits positive, debits negative
-const CHANGE = { $cond : [{ $eq : ['$type', 'credit'] }, '$amount', { $multiply : ['$amount', -1] }] };
+// signed amount: credits and refunds positive, debits negative, rollbacks already signed
+export const CHANGE = { $switch : {
+	branches : [
+		{ case : { $eq : ['$type', 'debit'] }, then : { $multiply : ['$amount', -1] } },
+		{ case : { $eq : ['$type', 'refund'] }, then : { $abs : '$amount' } }
+	],
+	default : '$amount'
+} };
 
 export type ListResult = {
 	rows   : any[];
@@ -28,6 +35,7 @@ export type ListResult = {
 	page   : number;           // clamped to the last page
 	credit : number;           // sums over the whole filtered result
 	debit  : number;
+	rounds : number;           // refunds + rollbacks, signed
 };
 
 export async function listTransactions (query: ListQuery): Promise<ListResult> {
@@ -41,7 +49,7 @@ export async function listTransactions (query: ListQuery): Promise<ListResult> {
 	if (created) match.created_at = created;
 
 	const admins: string[] = (await transactions.distinct('admin')).filter(Boolean).sort();
-	const empty = { rows : [], users : new Map(), admins, total : 0, pages : 1, page : 1, credit : 0, debit : 0 };
+	const empty = { rows : [], users : new Map(), admins, total : 0, pages : 1, page : 1, credit : 0, debit : 0, rounds : 0 };
 
 	if (query.q) {
 		const rx = new RegExp(escapeRegex(query.q), 'i');
@@ -58,7 +66,8 @@ export async function listTransactions (query: ListQuery): Promise<ListResult> {
 			_id    : null,
 			total  : { $sum : 1 },
 			credit : { $sum : { $cond : [{ $eq : ['$type', 'credit'] }, '$amount', 0] } },
-			debit  : { $sum : { $cond : [{ $eq : ['$type', 'debit'] }, '$amount', 0] } }
+			debit  : { $sum : { $cond : [{ $eq : ['$type', 'debit'] }, '$amount', 0] } },
+			rounds : { $sum : { $cond : [{ $in : ['$type', ['refund', 'rollback']] }, CHANGE, 0] } }
 		} }
 	]);
 	if (!meta) return empty;
@@ -87,6 +96,7 @@ export async function listTransactions (query: ListQuery): Promise<ListResult> {
 		pages,
 		page,
 		credit : meta.credit,
-		debit  : meta.debit
+		debit  : meta.debit,
+		rounds : meta.rounds
 	};
 }

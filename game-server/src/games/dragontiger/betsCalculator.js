@@ -236,7 +236,8 @@ module.exports = {
 
 			if (markId) {
 				await models.gameMarks.updateOne({ _id : markId }, {
-					$push : { mark : { $each : [gameMarksData], $position : 200 } }
+					// round_id: lets a void (admin) take exactly this round's mark off the road map
+					$push : { mark : { $each : [Object.assign({ round_id : result.roundId }, gameMarksData)], $position : 200 } }
 				}, { session });
 			}
 		});

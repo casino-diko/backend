@@ -14,7 +14,7 @@ test('keeps valid values', () => {
 });
 
 test('drops invalid values', () => {
-	const q = parseListQuery({ type : 'refund', sort : 'user_id', dir : 'sideways', page : '-2', size : '7', from : '2026-02-30', to : 'yesterday' });
+	const q = parseListQuery({ type : 'bonus', sort : 'user_id', dir : 'sideways', page : '-2', size : '7', from : '2026-02-30', to : 'yesterday' });
 	assert.equal(q.type, '');
 	assert.equal(q.sort, 'time');
 	assert.equal(q.dir, 'desc');
@@ -54,4 +54,9 @@ test('pageList shows the ends and two pages around the current one', async () =>
 	assert.deepEqual(pageList(1, 10), [1, 2, 3, null, 10]);
 	assert.deepEqual(pageList(6, 12), [1, null, 4, 5, 6, 7, 8, null, 12]);
 	assert.deepEqual(pageList(4, 7), [1, 2, 3, 4, 5, 6, 7]);
+});
+
+test('refunds and rollbacks of rounds are types too', () => {
+	assert.equal(parseListQuery({ type : 'refund' }).type, 'refund');
+	assert.equal(parseListQuery({ type : 'rollback' }).type, 'rollback');
 });

@@ -85,3 +85,25 @@ label.check input { width: auto; margin-top: 3px; }
 .brand-preview.checker { background: repeating-conic-gradient(#e7e7e7 0% 25%, #ffffff 0% 50%) 0 0 / 16px 16px; }
 .row.upload label { min-width: 0; }
 .row.upload input[type=file] { width: 100%; max-width: 280px; }
+
+/* rounds */
+.pill { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.pill.st-E { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.pill.st-C { color: #8a5a00; background: var(--warn-bg); }
+.pill.st-V { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.pill.st-S, .pill.st-P, .pill.st-H { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+@media (prefers-color-scheme: dark) { .pill.st-C { color: #f0c060; } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chips a { padding: 5px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+.chips a[aria-current] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chips .count { opacity: .7; font-variant-numeric: tabular-nums; }
+.totals { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 12px; color: var(--muted); }
+.totals b { color: var(--text); font-variant-numeric: tabular-nums; }
+td.result small, td.num small { display: block; }
+td.result { min-width: 160px; }
+.nowrap { white-space: nowrap; }
+.struck { text-decoration: line-through; color: var(--muted); }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+button.danger { background: var(--bad); border-color: var(--bad); }

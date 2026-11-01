@@ -619,7 +619,8 @@ module.exports = {
 	},
 
 	async fnSetRoundStatus (roundNum, status, tableId) {
-		await models.rounds.updateOne({ round_num : roundNum, table_id : tableId }, { $set : { status } });
+		// a resulted, cancelled or voided round is never reopened
+		await models.rounds.updateOne({ round_num : roundNum, table_id : tableId, status : { $in : ['S', 'P', 'H'] } }, { $set : { status } });
 	},
 
 	async fnProcessAutoNextRound (searchId) {
@@ -632,16 +633,6 @@ module.exports = {
 		await models.tables.updateOne({ _id : table._id }, { $set : { bet_setting : settings } });
 
 		return (settings.auto_next_round == 'Y') ? settings.delay_time : 0;
-	},
-
-	async fnProcessLastRounds (searchId, amt) {
-		const value = Number(amt);
-		if (amt === null || amt === undefined || amt === '' || !Number.isFinite(value)) throw false;
-
-		await models.tables.updateOne({ _id : searchId }, { $set : { 'bet_setting.lastrounds' : value } })
-			.catch(() => Promise.reject(false));
-
-		return amt;
 	},
 
 	/**

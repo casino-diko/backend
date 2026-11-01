@@ -40,7 +40,9 @@ const dealers = () => new Schema({
 	table_image  : String,
 	code         : { type : String, index : true },
 	table_name   : String,
-	status       : { type : String, enum : ['0', '1'], default : '1' }
+	status       : { type : String, enum : ['0', '1'], default : '1' },
+	// a supervisor's badge confirms a round cancel (core/tableControl)
+	supervisor   : { type : Boolean, default : false }
 }, options('dealers'));
 
 const vendors = () => new Schema({
@@ -120,6 +122,41 @@ const rooms = () => new Schema({
 	status    : { type : String, default : '1' }
 }, options('rooms', { strict : false }));
 
+// player balance log, shared with the admin (which owns its indexes, request_id is unique there):
+// admin credit / debit adjustments, and the game-server's refunds of cancelled rounds
+const transactions = () => new Schema({
+	_id            : Number,
+	user_id        : Number,
+	vendor_id      : Number,
+	type           : String,
+	amount         : Number,
+	balance_before : Number,
+	balance_after  : Number,
+	currency       : String,
+	note           : String,
+	admin          : String,
+	request_id     : String,
+	game           : String,
+	table_id       : Number,
+	round_id       : Number,
+	round_num      : Number,
+	bet_id         : Number
+}, options('transactions', { strict : false, autoIndex : false }));
+
+// seamless wallet calls (refund / rollback) waiting to be sent to a vendor's API;
+// _id is the action id the vendor uses to apply each call only once
+const vendorCalls = () => new Schema({
+	_id        : String,
+	vendor_id  : Number,
+	user_id    : Number,
+	game       : String,
+	type       : String,
+	body       : Mixed,
+	attempts   : { type : Number, default : 0 },
+	last_error : String,
+	done_at    : Date
+}, options('vendor_calls')).index({ done_at : 1 });
+
 // ------------------------------------------------------------------ game db
 
 const gameTables = () => new Schema({
@@ -142,11 +179,16 @@ const rounds = () => new Schema({
 	dealer_id   : Number,
 	shoe_id     : Number,
 	round_num   : { type : Number, required : true },
-	status      : { type : String, enum : ['S', 'E', 'H', 'P'], default : 'S' },
+	// S betting, P dealing, H hold, E resulted, C cancelled before a result, V voided after one
+	status      : { type : String, enum : ['S', 'E', 'H', 'P', 'C', 'V'], default : 'S' },
 	game_info   : { type : Mixed, default : null },
 	game_result : { type : Mixed, default : null },
-	modify_flag : Mixed
-}, options('rounds', { minimize : false })).index({ table_id : 1, round_num : -1 });
+	modify_flag : Mixed,
+	// how a C / V round was closed: { action, reason, dealer_id, supervisor_id, admin, at }
+	closed      : { type : Mixed, default : undefined }
+}, options('rounds', { minimize : false }))
+	.index({ table_id : 1, round_num : -1 })
+	.index({ table_id : 1, status : 1, created_at : -1 });
 
 const bets = () => new Schema({
 	_id           : Number,
@@ -162,7 +204,10 @@ const bets = () => new Schema({
 	bet_range     : String,
 	session_id    : String,
 	bet_id        : String,
-	currency      : { type : String, enum : CURRENCIES.concat(null), default : null }
+	currency      : { type : String, enum : CURRENCIES.concat(null), default : null },
+	// set when the round closes without a normal result: 'refunded' (cancelled) | 'rolled_back' (voided)
+	status        : String,
+	refunded      : Number
 }, options('bets', { minimize : false }));
 
 // road map: one document per shoe, `mark` holds one entry per resulted round
@@ -208,6 +253,6 @@ const counters = () => new Schema({
 }, { collection : 'counters', versionKey : false });
 
 module.exports = {
-	dealers, vendors, users, maintenance, notice, rooms,
+	dealers, vendors, users, maintenance, notice, rooms, transactions, vendorCalls,
 	gameTables, rounds, bets, gameMarks, shoes, infoMarks, dealerLogs, pokerBonus, counters
 };

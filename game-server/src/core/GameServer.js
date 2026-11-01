@@ -13,6 +13,9 @@
  |   services   : { fnGetTablesMarks(gameName) -> init payload, roomDisconnect(msg)? }
  |   initSocket(socket) : sets the per dealer socket state
  |
+ | Every dealer socket also gets the events all games share (cancelround,
+ | lastrounds, reopentable: core/tableControl).
+ |
  */
 
 const http      = require('http');
@@ -21,6 +24,8 @@ const _         = require('lodash');
 const { Server } = require('socket.io');
 const publisher = require('./publisher');
 const logger    = require('./logger');
+const models    = require('./models');
+const tableControl  = require('./tableControl');
 const regionalRange = require('./regionalRanges');
 
 const REGION_CHINA = 'china';
@@ -69,6 +74,14 @@ class GameServer {
 			this.game.controller.fnFetchMarks();
 		}
 		this.game.controller.fnDealerListener(socket);
+		tableControl.attach(socket, {
+			models  : models.forGame(this.conf.key),
+			key     : this.conf.key,
+			publish : data => {
+				console.log(` [${data.gameName}] publish ${data.eventName} `.info, JSON.stringify(data));
+				publisher.publish(data);
+			}
+		});
 
 		socket.on('disconnect', () => {
 			logger.show('DISCONNECT', socket).catch(() => console.log(`[${this.gameName}] socket disconnected`));

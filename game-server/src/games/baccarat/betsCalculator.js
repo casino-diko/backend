@@ -56,9 +56,9 @@ module.exports = {
         let gameResult = _.pick(result, ["winner", "pairs", "supersix", "bonus", "size"]);
 
         let gameMark = await models.withTransaction(async session => {
-            // without bets the round was closed whatever its status (but never twice)
+            // without bets the round is closed from any open status (never twice, never after a cancel)
             let round = await models.rounds.findOneAndUpdate(
-                { table_id : tableId, round_num : roundNum, status : _.isEmpty(settled.data) ? { $ne : "E" } : "P" },
+                { table_id : tableId, round_num : roundNum, status : _.isEmpty(settled.data) ? { $in : ["S", "P", "H"] } : "P" },
                 { $set : { status : "E", game_result : gameResult } },
                 { session, new : true }
             );

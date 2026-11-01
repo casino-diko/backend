@@ -16,6 +16,7 @@ const models         = require('./db');
 const publisher      = require('../../core/publisher');
 const logger         = require('../../core/logger');
 const errorHandler   = require('../../core/errorHandler')(models);
+const tableControl   = require('../../core/tableControl');
 
 module.exports = {
 	markJson      : {},
@@ -305,6 +306,16 @@ module.exports = {
 								dealerName     : dealerSocket.name
 							});
 							next(data.result);
+
+							// last rounds countdown (core/tableControl)
+							tableControl.afterResult(models, {
+								gameName : dealerSocket.gameName,
+								tableId  : dealerSocket.tableId,
+								roundId  : dealerSocket.roundId,
+								roundNum : dealerSocket.roundNum,
+								dealerId : dealerSocket.dealerId
+							}).then(events => events.forEach(e => this.sendToSocketServer(e)))
+								.catch(e => console.log('last rounds failed'.error, e));
 						}, e => {
 							console.log('err: ', e);
 							errorHandler(dealerSocket, 'Error:displayresults');
@@ -317,14 +328,19 @@ module.exports = {
 					}).catch(e => console.log('displayresults failed'.error, e));
 				break;
 
-				case 'newround' :
-					services.fnProcessNewRound(
-						dealerSocket.tableId,
-						dealerSocket.dealerId,
-						dealerSocket.realName,
-						dealerSocket.shoeId,
-						data.roundNum
-					)
+				case 'newround' : {
+					let lastrounds = 0;
+					tableControl.beforeNewRound(models, dealerSocket.tableId)
+					.then(t => {
+						lastrounds = t.lastrounds;
+						return services.fnProcessNewRound(
+							dealerSocket.tableId,
+							dealerSocket.dealerId,
+							dealerSocket.realName,
+							dealerSocket.shoeId,
+							data.roundNum
+						);
+					})
 					.then(round => {
 						dealerSocket.postStatus = 'S';
 						dealerSocket.status     = 'S';
@@ -341,15 +357,21 @@ module.exports = {
 							roundId   : parseInt(dealerSocket.roundId),
 							roundNum  : parseInt(dealerSocket.roundNum),
 							bettimer  : parseInt(dealerSocket.bettimer),
-							status    : 'S'
+							status    : 'S',
+							lastround : lastrounds
 						});
 						next(round.round_num);
 					}).catch(e => {
+						if (e instanceof tableControl.TableControlError) {
+							next({ error : true, message : e.message });
+							return;
+						}
 						console.log('newround failed'.error, e);
 						errorHandler(dealerSocket, 'Error:newround');
 						next(false);
 					});
 				break;
+				}
 
 				case 'removeitem' : {
 					const deleteData = {

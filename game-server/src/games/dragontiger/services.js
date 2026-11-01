@@ -259,7 +259,8 @@ module.exports = {
 
 	/** sets the round status; with expectedStatus only when the round is still in it */
 	async fnSetRoundStatus (roundId, status, tableId, roundNum, expectedStatus = null) {
-		const filter = { table_id : tableId, round_num : roundNum };
+		// a resulted, cancelled or voided round is never reopened
+		const filter = { table_id : tableId, round_num : roundNum, status : { $in : ['S', 'P', 'H'] } };
 
 		if (expectedStatus) {
 			filter.status = expectedStatus;

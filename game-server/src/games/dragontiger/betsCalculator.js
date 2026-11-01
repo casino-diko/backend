@@ -197,6 +197,11 @@ module.exports = {
 			? { roundWins : 0, userInfo : null, apiUserInfo : [], betUpdates : [], moneyIncs : [] }
 			: this.fnSettle(result, result.bets);
 
+		// a resulted, cancelled or voided round is never settled (again)
+		if (!['S', 'P', 'H'].includes(roundStatus)) {
+			throw new Error(`round ${result.roundId} is '${roundStatus}', not settled`);
+		}
+
 		await models.withTransaction(async session => {
 			const ended = await models.rounds.updateOne(
 				{ _id : result.roundId, status : roundStatus },

@@ -14,7 +14,11 @@
  | Env: DEALER_HOST (default 127.0.0.1), BACCARAT_PORT / DRAGONTIGER_PORT /
  | POKER_PORT, DEALER_GAMES, BET_SECONDS (15), STREET_SECONDS (poker
  | flop/turn/river decisions, 10), RESULT_SECONDS (pause after results, 8),
- | CARD_MS (pause between card scans, 1200).
+ | CARD_MS (pause between card scans, 1200), CANCEL_RATE (share of rounds the
+ | supervisor cancels while betting, 0.05; 0 never), SUPERVISOR (badge, S0001).
+ |
+ | A round the simulator left open (stopped mid round) is cancelled on start,
+ | so its stakes go back to the players.
  |
  */
 
@@ -29,6 +33,9 @@ const BET_SECONDS    = parseInt(env.BET_SECONDS || 15);
 const STREET_SECONDS = parseInt(env.STREET_SECONDS || 10);
 const RESULT_SECONDS = parseInt(env.RESULT_SECONDS || 8);
 const CARD_MS        = parseInt(env.CARD_MS || 1200);
+const CANCEL_RATE    = parseFloat(env.CANCEL_RATE || 0.05);
+const SUPERVISOR     = env.SUPERVISOR || 'S0001';
+const CANCEL_REASONS = ['misdeal', 'card dropped', 'scanner fault', 'video lost'];
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const card  = () => String(Math.floor(Math.random() * 52)).padStart(4, '0');
@@ -158,10 +165,22 @@ class TableDealer {
 		}
 	}
 
+	async cancel (roundNum, reason) {
+		const ack = await this.send({ event : 'cancelround', data : { supervisor : SUPERVISOR, reason } });
+		if (ack && !ack.error) this.log(`round ${roundNum}: cancelled (${reason}), ${ack.totalRefunded} refunded`, 'warn');
+		return ack;
+	}
+
 	async round () {
 		const p = this.protocol;
 		const row = await this.send(p.init(this.tableId));
 		if (!row || row.error || row.roundNum === undefined) throw new Error(`init failed: ${JSON.stringify(row)}`);
+
+		// left open by a stopped run: give the stakes back before starting over
+		if (['S', 'P', 'H'].includes(row.status)) {
+			const c = await this.cancel(row.roundNum, 'other');
+			if (c && c.error && !/not open/.test(c.message)) throw new Error(`cancel failed: ${c.message}`);
+		}
 
 		const started = await this.send(p.newround(row.roundNum));
 		if (!started || started.error) throw new Error(`newround failed: ${JSON.stringify(started)}`);
@@ -169,6 +188,14 @@ class TableDealer {
 		this.log(`round ${roundNum}: betting open for ${BET_SECONDS}s`);
 
 		await this.countdown(BET_SECONDS, 'startround');
+
+		if (Math.random() < CANCEL_RATE) {
+			const c = await this.cancel(roundNum, CANCEL_REASONS[Math.floor(Math.random() * CANCEL_REASONS.length)]);
+			if (c && c.error) throw new Error(`cancel failed: ${c.message}`);
+			await sleep(RESULT_SECONDS * 1000);
+			return;
+		}
+
 		if (p.beforeProgress) await p.beforeProgress.call(p, payload => this.send(payload));
 		await this.send({ event : 'stoptimer' });
 

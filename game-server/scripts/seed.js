@@ -77,7 +77,9 @@ async function seedShared () {
 	await upsertAll(s.dealers, [
 		{ _id : 1, name : 'Anna',  real_name : 'Anna Cruz',  code : 'D0001', dealer_image : '/lobby/image/dealers/abby.png', table_name : 'T1', status : '1' },
 		{ _id : 2, name : 'Bella', real_name : 'Bella Reyes', code : 'D0002', dealer_image : '/lobby/image/dealers/alice.png', table_name : 'T2', status : '1' },
-		{ _id : 3, name : 'Cara',  real_name : 'Cara Santos', code : 'D0003', dealer_image : '/lobby/image/dealers/aika.png', table_name : 'T3', status : '1' }
+		{ _id : 3, name : 'Cara',  real_name : 'Cara Santos', code : 'D0003', dealer_image : '/lobby/image/dealers/aika.png', table_name : 'T3', status : '1' },
+		// pit supervisor: scanning this badge confirms a round cancel
+		{ _id : 4, name : 'Sam',   real_name : 'Sam Lim',     code : 'S0001', dealer_image : '/lobby/image/dealers/abby.png', table_name : null, status : '1', supervisor : true }
 	]);
 
 	await upsertAll(s.vendors, [

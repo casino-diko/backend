@@ -15,6 +15,7 @@ const models         = require('./db.js');
 const publisher      = require('../../core/publisher');
 const logger         = require('../../core/logger');
 const errorHandler   = require('../../core/errorHandler')(models);
+const tableControl   = require('../../core/tableControl');
 
 const errorText = e => (e instanceof Error) ? e.message : JSON.stringify(e);
 
@@ -191,6 +192,7 @@ module.exports = {
 									userInfo       : roundMarkMoneyData.userInfo
 								});
 								next(d);
+								this.fnAfterResult(dealerSocket);
 							}).catch(e => {
 								console.log(`process bets: ${errorText(e)}`.error);
 								errorHandler(dealerSocket, 'Error: process bets');
@@ -203,13 +205,18 @@ module.exports = {
 						});
 					break;
 
-				case 'newround' :
-					services.fnProcessNewRound(
-						(data.data || {}).roundNum,
-						dealerSocket.tableId,
-						dealerSocket.dealerId,
-						dealerSocket.shoeId
-					).then(round => {
+				case 'newround' : {
+					let lastrounds = 0;
+					tableControl.beforeNewRound(models, dealerSocket.tableId)
+					.then(t => {
+						lastrounds = t.lastrounds;
+						return services.fnProcessNewRound(
+							(data.data || {}).roundNum,
+							dealerSocket.tableId,
+							dealerSocket.dealerId,
+							dealerSocket.shoeId
+						);
+					}).then(round => {
 						dealerSocket.postStatus = dealerSocket.status = 'S';
 						dealerSocket.roundId    = round.id;
 						dealerSocket.roundNum   = round.round_num;
@@ -224,15 +231,21 @@ module.exports = {
 							roundId   : parseInt(dealerSocket.roundId),
 							roundNum  : parseInt(dealerSocket.roundNum),
 							bettimer  : parseInt(dealerSocket.bettimer),
-							status    : dealerSocket.status
+							status    : dealerSocket.status,
+							lastround : lastrounds
 						});
 						next(round);
 					}).catch(e => {
+						if (e instanceof tableControl.TableControlError) {
+							next({ error : true, message : e.message });
+							return;
+						}
 						errorHandler(dealerSocket, 'Error : fnProcessNewRound');
 						console.log(errorText(e).error);
 						next(false);
 					});
 					break;
+				}
 
 				case 'removeitem' :
 					services.fnProcessDeleteCard(dealerSocket.roundNum, dealerSocket.tableId)
@@ -316,6 +329,18 @@ module.exports = {
 					break;
 			} //==end switch
 		}); //== end push event
+	},
+
+	/** last rounds countdown after a result (core/tableControl) */
+	fnAfterResult (dealerSocket) {
+		tableControl.afterResult(models, {
+			gameName : dealerSocket.gameName,
+			tableId  : dealerSocket.tableId,
+			roundId  : dealerSocket.roundId,
+			roundNum : dealerSocket.roundNum,
+			dealerId : dealerSocket.dealerId
+		}).then(events => events.forEach(e => this.publish(e)))
+			.catch(e => console.log(`last rounds: ${errorText(e)}`.error));
 	},
 
 	/**

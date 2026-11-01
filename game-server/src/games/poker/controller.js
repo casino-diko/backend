@@ -15,6 +15,7 @@ const models       = require('./db');
 const publisher    = require('../../core/publisher');
 const logger       = require('../../core/logger');
 const errorHandler = require('../../core/errorHandler')(models);
+const tableControl = require('../../core/tableControl');
 
 const freshGameInfo = () => ({
 	burn   : [],
@@ -295,6 +296,9 @@ module.exports = {
 		passResult (dealerSocket, data, next) {
 			if (dealerSocket.resultHolder) {
 				this.publish(dealerSocket.resultHolder);
+				// last rounds countdown, once the players have the result
+				(dealerSocket.afterResultEvents || []).forEach(e => this.publish(e));
+				dealerSocket.afterResultEvents = [];
 				next(true);
 			} else {
 				next(false);
@@ -376,6 +380,16 @@ module.exports = {
 					userInfo       : flag.userInfo,
 					meta           : result.meta
 				});
+				dealerSocket.afterResultEvents = await tableControl.afterResult(models, {
+					gameName : dealerSocket.gameName,
+					tableId  : dealerSocket.tableId,
+					roundId  : dealerSocket.roundId,
+					roundNum : dealerSocket.roundNum,
+					dealerId : dealerSocket.dealerId
+				}).catch(e => {
+					console.log('last rounds failed:'.error, e);
+					return [];
+				});
 				next(result);
 			} catch (e) {
 				console.log('displayresults failed:'.error, e);
@@ -385,10 +399,15 @@ module.exports = {
 		},
 
 		async newround (dealerSocket, data, next) {
-			let round;
+			let round, lastrounds;
 			try {
+				({ lastrounds } = await tableControl.beforeNewRound(models, dealerSocket.tableId));
 				round = await services.fnProcessNewRound(dealerSocket.tableId, dealerSocket.dealerId, data.roundNum);
 			} catch (err) {
+				if (err instanceof tableControl.TableControlError) {
+					next({ error : true, message : err.message });
+					return;
+				}
 				console.log('newround failed:'.error, err);
 				errorHandler(dealerSocket, 'Error - newround');
 				next({ error : true, message : errorMessage(err) });
@@ -411,7 +430,8 @@ module.exports = {
 				roundNum  : parseInt(dealerSocket.roundNum),
 				bettimer  : parseInt(dealerSocket.bettimer),
 				status    : 'S',
-				dealerId  : dealerSocket.dealerId
+				dealerId  : dealerSocket.dealerId,
+				lastround : lastrounds
 			});
 			next(round.round_num);
 		},
@@ -464,26 +484,6 @@ module.exports = {
 
 		async autonextround (dealerSocket, data, next) {
 			next(await services.fnProcessAutoNextRound(dealerSocket.tableId));
-		},
-
-		async lastrounds (dealerSocket, data, next) {
-			let lastround;
-			try {
-				lastround = await services.fnProcessLastRounds(dealerSocket.tableId, data.remaining);
-			} catch (e) {
-				next(e);
-				return;
-			}
-			this.publish({
-				gameName  : dealerSocket.gameName,
-				eventName : 'lastrounds',
-				roundId   : parseInt(dealerSocket.roundId),
-				roundNum  : parseInt(dealerSocket.roundNum),
-				dealerId  : parseInt(dealerSocket.dealerId),
-				tableId   : parseInt(dealerSocket.tableId),
-				lastround
-			});
-			next(lastround);
 		},
 
 		stoptimer (dealerSocket, data, next) {

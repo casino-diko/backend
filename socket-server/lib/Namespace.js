@@ -1290,8 +1290,24 @@ let Namespace = function (io, namespace, disableRooms, managerSocket, allSocket,
                         roundStatus: data.status,
                         totalWins: 0,
                         gameResult: {},
-                        currentRound: data.roundNum
+                        currentRound: data.roundNum,
+                        lastRounds: Number(data.lastround) || 0
                     }, gameName == 'Baccarat' ? {shoeBurnCard : ''} : {}));
+
+                // cancelled before a result: the stakes were refunded (game-server core/tableControl)
+                case 'roundcancelled':
+                    return Store.update(namespace, {
+                        gameInfo: {},
+                        roundStatus: 'C',
+                        gameResult: {},
+                        currentRound: data.roundNum
+                    });
+
+                // rounds left before the table closes (0: no countdown)
+                case 'lastrounds':
+                    return Store.update(namespace, {
+                        lastRounds: Number(data.lastround) || 0
+                    });
 
                 case 'setroundprogress':
                 case 'setroundhold':

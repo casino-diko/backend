@@ -64,6 +64,8 @@ const getShared = () => {
 		maintenance : conn.model('maintenance', schemas.maintenance()),
 		notice      : conn.model('notice', schemas.notice()),
 		rooms       : conn.model('room', schemas.rooms()),
+		transactions : conn.model('transaction', schemas.transactions()),
+		vendorCalls : conn.model('vendor_call', schemas.vendorCalls()),
 		nextId      : counterFor(conn)
 	};
 
@@ -106,6 +108,8 @@ const forGame = (key) => {
 		maintenance    : s.maintenance,
 		notice         : s.notice,
 		rooms          : s.rooms,
+		transactions   : s.transactions,
+		vendorCalls    : s.vendorCalls,
 		// game collections
 		tables,
 		rounds,

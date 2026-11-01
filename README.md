@@ -121,7 +121,7 @@ BET_SECONDS=30 npm run dealer     # longer betting windows (also STREET_SECONDS 
 |---|---|
 | Players 1, 2 | vendor with **transfer** wallet: the balance lives in MongoDB and changes on every bet / payout |
 | Player 3 | vendor with **seamless** wallet: the balance is held by the vendor API (`VENDOR_API_URL`); without one it reads 0 and bets are refused |
-| Dealers | codes `D0001`–`D0003` (scan a code on the dealer page to change dealer) |
+| Dealers | codes `D0001`–`D0003` (scan a code on the dealer page to change dealer); supervisor badge `S0001` (confirms a round cancel) |
 | Tables | 2 per game |
 
 ### Everyday commands

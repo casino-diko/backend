@@ -74,12 +74,18 @@ async function seedLobby (s) {
 async function seedShared () {
 	const s = models.getShared();
 
+	// one dealer per table, each with its own name and portrait (made by the web repo's
+	// scripts/dealer-images.mjs, public/lobby/image/dealers/portraits); Sam is the pit supervisor
+	const face = n => `/lobby/image/dealers/portraits/dealer_${n}.png`;
 	await upsertAll(s.dealers, [
-		{ _id : 1, name : 'Anna',  real_name : 'Anna Cruz',  code : 'D0001', dealer_image : '/lobby/image/dealers/abby.png', table_name : 'T1', status : '1' },
-		{ _id : 2, name : 'Bella', real_name : 'Bella Reyes', code : 'D0002', dealer_image : '/lobby/image/dealers/alice.png', table_name : 'T2', status : '1' },
-		{ _id : 3, name : 'Cara',  real_name : 'Cara Santos', code : 'D0003', dealer_image : '/lobby/image/dealers/aika.png', table_name : 'T3', status : '1' },
+		{ _id : 1, name : 'Anna',  real_name : 'Anna Cruz',   code : 'D0001', dealer_image : face('01'), table_name : 'Baccarat# 1', status : '1' },
+		{ _id : 2, name : 'Bella', real_name : 'Bella Reyes', code : 'D0002', dealer_image : face('03'), table_name : 'Baccarat# 2', status : '1' },
+		{ _id : 3, name : 'Cara',  real_name : 'Cara Santos', code : 'D0003', dealer_image : face('02'), table_name : 'Dragon-Tiger# 1', status : '1' },
+		{ _id : 5, name : 'Dana',  real_name : 'Dana Lopez',  code : 'D0004', dealer_image : face('05'), table_name : 'Dragon-Tiger# 2', status : '1' },
+		{ _id : 6, name : 'Ella',  real_name : 'Ella Tan',    code : 'D0005', dealer_image : face('07'), table_name : 'Poker# 1', status : '1' },
+		{ _id : 7, name : 'Faye',  real_name : 'Faye Garcia', code : 'D0006', dealer_image : face('06'), table_name : 'Poker# 2', status : '1' },
 		// pit supervisor: scanning this badge confirms a round cancel
-		{ _id : 4, name : 'Sam',   real_name : 'Sam Lim',     code : 'S0001', dealer_image : '/lobby/image/dealers/abby.png', table_name : null, status : '1', supervisor : true }
+		{ _id : 4, name : 'Sam',   real_name : 'Sam Lim',     code : 'S0001', dealer_image : face('04'), table_name : null, status : '1', supervisor : true }
 	]);
 
 	await upsertAll(s.vendors, [

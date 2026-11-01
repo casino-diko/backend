@@ -68,8 +68,8 @@ module.exports = async (models, { upsertAll }) => {
 	]);
 
 	await upsertAll(models.rounds, [
-		resultedRound(1, 1, 1),
-		resultedRound(2, 2, 2)
+		resultedRound(1, 1, 6),
+		resultedRound(2, 2, 7)
 	]);
 
 	// one road map document per resulted round (mark P/D/T = player / dealer / tie)

@@ -88,7 +88,7 @@ module.exports = async (models, { upsertAll }) => {
 
 	await upsertAll(models.rounds, [
 		{
-			_id : 1, table_id : 1, dealer_id : 1, shoe_id : 1, round_num : 2, status : 'E',
+			_id : 1, table_id : 1, dealer_id : 3, shoe_id : 1, round_num : 2, status : 'E',
 			game_info   : { burn : '0004', dragon : '0021', tiger : '0035' },
 			game_result : { winner : 'tiger', side_bets : {
 				dragon : { suite : 'heart', size : 'big', parity : 'odd' },
@@ -96,7 +96,7 @@ module.exports = async (models, { upsertAll }) => {
 			} }
 		},
 		{
-			_id : 2, table_id : 2, dealer_id : 2, shoe_id : 2, round_num : 0, status : 'E',
+			_id : 2, table_id : 2, dealer_id : 5, shoe_id : 2, round_num : 0, status : 'E',
 			game_info   : { burn : null, dragon : null, tiger : null },
 			game_result : null
 		}

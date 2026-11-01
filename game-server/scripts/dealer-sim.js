@@ -15,7 +15,14 @@
  | POKER_PORT, DEALER_GAMES, BET_SECONDS (15), STREET_SECONDS (poker
  | flop/turn/river decisions, 10), RESULT_SECONDS (pause after results, 8),
  | CARD_MS (pause between card scans, 1200), CANCEL_RATE (share of rounds the
- | supervisor cancels while betting, 0.05; 0 never), SUPERVISOR (badge, S0001).
+ | supervisor cancels while betting, 0.05; 0 never), SUPERVISOR (badge, S0001),
+ | FLIP_SECONDS (flippy squeeze time for the first four cards, 13) and
+ | FLIP_HIT_SECONDS (for each third card, 8).
+ |
+ | Flippy baccarat tables (bet_setting.type has 'flippy'): after the first
+ | four cards the players squeeze their cards while `flippytimer` ticks
+ | count down, then `flip` opens them on every screen; each third card gets
+ | its own countdown and `flip`. Then the results, as on any table.
  |
  | A round the simulator left open (stopped mid round) is cancelled on start,
  | so its stakes go back to the players.
@@ -36,6 +43,8 @@ const CARD_MS        = parseInt(env.CARD_MS || 1200);
 const CANCEL_RATE    = parseFloat(env.CANCEL_RATE || 0.05);
 const SUPERVISOR     = env.SUPERVISOR || 'S0001';
 const CANCEL_REASONS = ['misdeal', 'card dropped', 'scanner fault', 'video lost'];
+const FLIP_SECONDS     = parseInt(env.FLIP_SECONDS || 13);
+const FLIP_HIT_SECONDS = parseInt(env.FLIP_HIT_SECONDS || 8);
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const card  = () => String(Math.floor(Math.random() * 52)).padStart(4, '0');
@@ -89,10 +98,25 @@ const PROTOCOL = {
 		newround : roundNum => ({ event : 'newround', data : { roundNum } }),
 		tick     : (left, total) => ({ event : 'setbettingtime', data : { betTime : left, totalTime : total } }),
 		card     : (from, value) => ({ event : 'inputitem', data : { from, value } }),
-		async deal (send) {
-			for (const [from, value] of baccaratHand()) {
+		async deal (send, countdown, table) {
+			const hand = baccaratHand();
+			if (!table.flippy) {
+				for (const [from, value] of hand) {
+					await sleep(CARD_MS);
+					await send(this.card(from, value));
+				}
+				return;
+			}
+			// flippy: the players squeeze the first four cards, then each third card on its own
+			for (const [from, value] of hand.slice(0, 4)) {
 				await sleep(CARD_MS);
 				await send(this.card(from, value));
+			}
+			await table.flip(FLIP_SECONDS);
+			for (const [from, value] of hand.slice(4)) {
+				await sleep(CARD_MS);
+				await send(this.card(from, value));
+				await table.flip(FLIP_HIT_SECONDS);
 			}
 		}
 	},
@@ -171,6 +195,16 @@ class TableDealer {
 		return ack;
 	}
 
+	/** flippy squeeze time: `flippytimer` ticks down to 0, then `flip` opens the cards on every screen */
+	async flippyPhase (seconds) {
+		for (let left = seconds; left >= 0; left--) {
+			this.socket.emit('push', { event : 'flippytimer', data : { betTime : left, totalTime : seconds } });
+			if (left) await sleep(1000);
+		}
+		const ack = await this.send({ event : 'flip' });
+		if (ack !== true) throw new Error(`flip refused: ${JSON.stringify(ack)}`);
+	}
+
 	async round () {
 		const p = this.protocol;
 		const row = await this.send(p.init(this.tableId));
@@ -185,7 +219,7 @@ class TableDealer {
 		const started = await this.send(p.newround(row.roundNum));
 		if (!started || started.error) throw new Error(`newround failed: ${JSON.stringify(started)}`);
 		const roundNum = typeof started === 'object' ? started.round_num : started;
-		this.log(`round ${roundNum}: betting open for ${BET_SECONDS}s`);
+		this.log(`round ${roundNum}: betting open for ${BET_SECONDS}s${row.type === 'flippy' ? ' (flippy)' : ''}`);
 
 		await this.countdown(BET_SECONDS, 'startround');
 
@@ -207,7 +241,10 @@ class TableDealer {
 			if (ack === false || (ack && ack.error) || ack === 'roundStatusError') {
 				throw new Error(`card refused: ${JSON.stringify(payload)} -> ${JSON.stringify(ack)}`);
 			}
-		}, (seconds, type) => this.countdown(seconds, type));
+		}, (seconds, type) => this.countdown(seconds, type), {
+			flippy : row.type === 'flippy',
+			flip   : seconds => this.flippyPhase(seconds)
+		});
 
 		await sleep(CARD_MS);
 		const result = await this.send({ event : 'displayresults' }, 30000);

@@ -154,7 +154,7 @@ async function main () {
 	assert.equal(r.closed.action, 'cancel');
 	assert.equal(r.closed.supervisor_id, 4);
 	const bets = await models.bets.find({ _id : { $in : [bet1, bet3] } }).sort({ _id : 1 }).lean();
-	assert.deepEqual(bets.map(b => [b.status, b.refunded, b.total_win]), [['refunded', 150, 0], ['refunded', 120, 0]]);
+	assert.deepEqual(bets.map(b => [b.status, b.refunded, b.total_win]), [['refunded', 150, 150], ['refunded', 120, 120]]);
 	assert.equal((await models.users.findById(1).lean()).money, before[1]);
 	assert.equal((await models.users.findById(3).lean()).money, before[3]);
 	const tx = await models.transactions.findOne({ request_id : `refund:dragontiger:${bet1}` }).lean();
@@ -191,7 +191,7 @@ async function main () {
 	ok('lastrounds 1 stored and published');
 
 	left = waitFor('lastrounds', d => d.lastround === 0);
-	const maint = waitFor('maintenancechange', d => d.data.status === 1);
+	const maint = waitFor('maintenanceChange', d => d.data.status === 1);
 	const closed = waitFor('tableclosed');
 	await playToResult();
 	await left;
@@ -208,7 +208,7 @@ async function main () {
 	assert.match(e.message, /closed/);
 	ok('newround refused while closed');
 
-	const reopened = waitFor('maintenancechange', d => d.data.status === 0);
+	const reopened = waitFor('maintenanceChange', d => d.data.status === 0);
 	assert.equal(await push({ event : 'reopentable' }), true);
 	await reopened;
 	t = await table();

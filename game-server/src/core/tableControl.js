@@ -137,11 +137,13 @@ async function cancelRound (models, { key, tableId, roundNum, reason, dealerId, 
 		const plan = planRefunds(bets, keyBy(users), keyBy(vendors));
 		const amountByBet = Object.fromEntries(plan.map(p => [p.betId, p.amount]));
 
+		// total_win is what went back to the player (settlement's meaning: credited, stake included),
+		// so every bet history shows a refunded bet as even, never as a loss
 		if (bets.length) {
 			await models.bets.bulkWrite(bets.map(b => ({
 				updateOne : {
 					filter : { _id : b._id, status : { $nin : ['refunded', 'rolled_back'] } },
-					update : { $set : { status : 'refunded', refunded : amountByBet[b._id] || 0, total_win : 0, total_winning : 0, total_lost : 0 } }
+					update : { $set : { status : 'refunded', refunded : amountByBet[b._id] || 0, total_win : amountByBet[b._id] || 0, total_winning : 0, total_lost : 0 } }
 				}
 			})), { session });
 		}
@@ -269,7 +271,7 @@ async function afterResult (models, { gameName, tableId, roundId, roundNum, deal
 	const events = [Object.assign({ eventName : 'lastrounds', lastround : step.left }, base)];
 	if (step.closes) {
 		const data = await setNowMaintenance(models, tableId, true);
-		events.push(Object.assign({ eventName : 'maintenancechange', data }, base));
+		events.push(Object.assign({ eventName : 'maintenanceChange', data }, base));
 		events.push(Object.assign({ eventName : 'tableclosed', text : CLOSED_TEXT }, base));
 	}
 	return events;
@@ -362,7 +364,7 @@ const handlers = {
 		const tableId = parseInt(socket.tableId);
 		await models.tables.updateOne({ _id : tableId }, { $set : { 'bet_setting.lastrounds' : 0, 'bet_setting.closed' : false } });
 		const data = await setNowMaintenance(models, tableId, false);
-		publish(Object.assign(base(), { eventName : 'maintenancechange', data }));
+		publish(Object.assign(base(), { eventName : 'maintenanceChange', data }));
 		publish(Object.assign(base(), { eventName : 'lastrounds', lastround : 0 }));
 		publish(Object.assign(base(), { eventName : 'tablereopened' }));
 		return true;
